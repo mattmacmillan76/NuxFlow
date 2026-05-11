@@ -1,6 +1,8 @@
 import { useDb } from '../../utils/db'
-import { sites } from '@nuxflow/db/schema'
-import { eq } from 'drizzle-orm'
+import { sites, siteSettings } from '@nuxflow/db/schema'
+import { and, eq, inArray } from 'drizzle-orm'
+
+const FRONTEND_KEYS = ['frontend.show_header', 'frontend.show_color_toggle'] as const
 
 export default defineEventHandler(async (event) => {
   const siteId = event.context.siteId as string | null
@@ -13,5 +15,15 @@ export default defineEventHandler(async (event) => {
   })
   if (!site) throw createError({ statusCode: 404 })
 
-  return site
+  const rows = await db.query.siteSettings.findMany({
+    where: and(eq(siteSettings.siteId, siteId), inArray(siteSettings.key, [...FRONTEND_KEYS])),
+  })
+
+  const kvMap = Object.fromEntries(rows.map(r => [r.key, r.value]))
+
+  return {
+    ...site,
+    showHeader: (kvMap['frontend.show_header'] as boolean | undefined) !== false,
+    showColorToggle: (kvMap['frontend.show_color_toggle'] as boolean | undefined) !== false,
+  }
 })

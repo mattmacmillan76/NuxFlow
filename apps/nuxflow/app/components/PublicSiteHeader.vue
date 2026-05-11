@@ -8,8 +8,14 @@ interface MenuItem {
   url?: string; slug?: string; target: '_self' | '_blank'
   children: ChildItem[]
 }
+interface SitePublic {
+  name: string
+  domain: string
+  showHeader: boolean
+  showColorToggle: boolean
+}
 
-const { data: site } = await useFetch('/api/public/site')
+const { data: site } = await useFetch<SitePublic>('/api/public/site')
 const { data: menu } = await useFetch<{ items: unknown[] } | null>('/api/public/menus/header')
 
 const navItems = computed<MenuItem[]>(() => (menu.value?.items ?? []) as MenuItem[])
@@ -24,7 +30,7 @@ watch(() => route.path, () => { mobileOpen.value = false })
 </script>
 
 <template>
-  <header class="glass sticky top-0 z-50" style="border-bottom: 1px solid var(--glass-border);">
+  <header v-if="site?.showHeader !== false" class="glass sticky top-0 z-50" style="border-bottom: 1px solid var(--glass-border);">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
       <!-- Logo -->
       <NuxtLink to="/" class="font-bold text-lg text-gray-900 dark:text-white hover:text-primary-500 transition-colors shrink-0">
@@ -74,7 +80,7 @@ watch(() => route.path, () => { mobileOpen.value = false })
 
       <div class="flex items-center gap-2 ml-auto">
         <ClientOnly>
-          <UColorModeButton size="sm" />
+          <UColorModeButton v-if="site?.showColorToggle !== false" size="sm" />
         </ClientOnly>
         <!-- Mobile hamburger -->
         <button

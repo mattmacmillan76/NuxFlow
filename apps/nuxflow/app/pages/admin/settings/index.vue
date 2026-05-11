@@ -10,6 +10,7 @@ const { data, refresh } = await useFetch<SiteData>('/api/v1/settings')
 
 const tabs = [
   { label: 'General', icon: 'i-lucide-settings' },
+  { label: 'Appearance', icon: 'i-lucide-palette' },
   { label: 'Email', icon: 'i-lucide-mail' },
   { label: 'Integrations', icon: 'i-lucide-plug' },
   { label: 'Danger zone', icon: 'i-lucide-triangle-alert' },
@@ -41,6 +42,12 @@ const timezones = [
   'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Tokyo', 'Asia/Singapore',
   'Australia/Sydney',
 ].map(v => ({ label: v, value: v }))
+
+// ── Appearance ────────────────────────────────────────────────────────────────
+const appearance = reactive({
+  showHeader: true,
+  showColorToggle: true,
+})
 
 // ── Email ─────────────────────────────────────────────────────────────────────
 const email = reactive({
@@ -81,6 +88,8 @@ watch(data, (d) => {
   email.smtpUser = (s['email.smtp_user'] as string) ?? ''
   integrations.turnstileSiteKey = (s['integrations.turnstile_site_key'] as string) ?? ''
   integrations.analyticsId = (s['integrations.analytics_id'] as string) ?? ''
+  appearance.showHeader = (s['frontend.show_header'] as boolean | undefined) !== false
+  appearance.showColorToggle = (s['frontend.show_color_toggle'] as boolean | undefined) !== false
 }, { immediate: true })
 
 async function save() {
@@ -95,6 +104,8 @@ async function save() {
       'email.smtp_user': email.smtpUser,
       'integrations.turnstile_site_key': integrations.turnstileSiteKey,
       'integrations.analytics_id': integrations.analyticsId,
+      'frontend.show_header': appearance.showHeader,
+      'frontend.show_color_toggle': appearance.showColorToggle,
     }
     await $fetch('/api/v1/settings', {
       method: 'PATCH',
@@ -177,6 +188,34 @@ async function deleteSite() {
                 />
                 <p class="mt-1 text-xs text-gray-400">Maintenance mode shows a holding page to visitors.</p>
               </UFormField>
+            </div>
+            <template #footer>
+              <div class="flex justify-end">
+                <UButton :loading="saving" @click="save">Save changes</UButton>
+              </div>
+            </template>
+          </UCard>
+        </template>
+
+        <!-- Appearance -->
+        <template v-if="active === 'Appearance'">
+          <UCard>
+            <template #header><p class="text-sm font-semibold">Frontend header</p></template>
+            <div class="space-y-5">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">Show header bar</p>
+                  <p class="mt-0.5 text-xs text-gray-400">Displays the site name and navigation bar at the top of every public page.</p>
+                </div>
+                <UToggle v-model="appearance.showHeader" />
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">Show colour mode toggle</p>
+                  <p class="mt-0.5 text-xs text-gray-400">Lets visitors switch between light and dark mode. Disable for sites with a fixed colour scheme.</p>
+                </div>
+                <UToggle v-model="appearance.showColorToggle" />
+              </div>
             </div>
             <template #footer>
               <div class="flex justify-end">

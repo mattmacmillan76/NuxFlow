@@ -41,7 +41,7 @@ async function applyMigrations(event: H3Event) {
     for (const key of keys) {
       await db.run(sql`INSERT OR IGNORE INTO _nuxflow_migrations (filename) VALUES (${key})`)
     }
-    console.log('[nuxflow:migrate] Pre-existing schema detected — migration tracking seeded')
+    console.warn('[nuxflow:migrate] Pre-existing schema detected — migration tracking seeded')
     return
   }
 
@@ -57,7 +57,7 @@ async function applyMigrations(event: H3Event) {
     count++
   }
 
-  if (count > 0) console.log(`[nuxflow:migrate] Applied ${count} migration(s)`)
+  if (count > 0) console.warn(`[nuxflow:migrate] Applied ${count} migration(s)`)
 }
 
 async function tableExists(db: ReturnType<typeof useDb>, table: string): Promise<boolean> {

@@ -176,15 +176,16 @@ async function deleteSite() {
                 <UInput v-model="general.name" placeholder="My Site" />
               </UFormField>
               <UFormField label="Default locale">
-                <USelect v-model="general.locale" :items="localeOptions" />
+                <USelect v-model="general.locale" :items="localeOptions" class="w-full" />
               </UFormField>
               <UFormField label="Timezone">
-                <USelect v-model="general.timezone" :items="timezones" />
+                <USelect v-model="general.timezone" :items="timezones" class="w-full" />
               </UFormField>
               <UFormField label="Site mode">
                 <USelect
                   v-model="general.status"
                   :items="[{ label: 'Active', value: 'active' }, { label: 'Maintenance mode', value: 'maintenance' }]"
+                  class="w-full"
                 />
                 <p class="mt-1 text-xs text-gray-400">Maintenance mode shows a holding page to visitors.</p>
               </UFormField>
@@ -231,7 +232,7 @@ async function deleteSite() {
             <template #header><p class="text-sm font-semibold">Email delivery</p></template>
             <div class="space-y-4">
               <UFormField label="Provider">
-                <USelect v-model="email.provider" :items="emailProviderOptions" />
+                <USelect v-model="email.provider" :items="emailProviderOptions" class="w-full" />
               </UFormField>
 
               <template v-if="email.provider === 'resend'">

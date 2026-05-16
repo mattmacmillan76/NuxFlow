@@ -139,22 +139,7 @@ wrangler d1 execute nuxflow --remote --file=../../packages/db/migrations/0001_pl
 
 When NuxFlow receives future schema updates, repeat this step with only the new migration files.
 
-### Step 4: Add Production Secrets
-
-Add each secret. Wrangler will prompt you to type or paste the value — it is not passed as a command-line argument:
-
-```bash
-wrangler secret put NUXT_BETTER_AUTH_SECRET
-wrangler secret put NUXT_PUBLIC_SITE_URL
-```
-
-You can also manage secrets in the Cloudflare dashboard under **Workers & Pages → nuxflow → Settings → Variables and Secrets**.
-
-::note
-D1 does not require any secrets. The database connection is handled automatically through the `DB` binding declared in `wrangler.toml`.
-::
-
-### Step 5: Build and Deploy
+### Step 4: Build and Deploy
 
 Return to the repo root, build, then deploy:
 
@@ -163,6 +148,24 @@ cd ../..
 pnpm build
 pnpm --filter @nuxflow/app run deploy
 ```
+
+### Step 5: Add Production Secrets
+
+With the worker now deployed, add your runtime secrets. Wrangler will prompt you to type or paste the value — it is never passed as a command-line argument:
+
+```bash
+cd apps/nuxflow
+wrangler secret put NUXT_BETTER_AUTH_SECRET
+wrangler secret put NUXT_PUBLIC_SITE_URL
+```
+
+Secrets on Cloudflare Workers take effect immediately — no redeploy is needed after adding them.
+
+You can also manage secrets in the Cloudflare dashboard under **Workers & Pages → nuxflow → Settings → Variables and Secrets**.
+
+::note
+D1 does not require any secrets. The database connection is handled automatically through the `DB` binding declared in `wrangler.toml`.
+::
 
 ### Step 6: Add a Custom Domain
 

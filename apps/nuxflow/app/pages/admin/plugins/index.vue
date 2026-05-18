@@ -3,9 +3,6 @@ definePageMeta({ layout: 'admin', middleware: ['auth'] })
 
 const toast = useToast()
 
-const { data, refresh } = await useFetch('/api/v1/plugins')
-const items = computed(() => data.value?.plugins ?? [])
-
 // Dynamic plugins
 interface DynamicPlugin {
   id: string
@@ -82,94 +79,11 @@ async function dynUninstall(id: string, name: string) {
   }
 }
 
-async function install(id: string) {
-  try {
-    await $fetch(`/api/v1/plugins/${id}/install`, { method: 'POST' })
-    await refresh()
-    toast.add({ title: 'Plugin installed', color: 'green' })
-  } catch (e: unknown) {
-    const msg = (e as { data?: { message?: string } })?.data?.message ?? 'Install failed'
-    toast.add({ title: msg, color: 'red' })
-  }
-}
-
-async function uninstall(id: string, name: string) {
-  if (!confirm(`Uninstall "${name}"? This will deactivate it immediately.`)) return
-  try {
-    await $fetch(`/api/v1/plugins/${id}/uninstall`, { method: 'DELETE' })
-    await refresh()
-    toast.add({ title: 'Plugin uninstalled', color: 'green' })
-  } catch (e: unknown) {
-    const msg = (e as { data?: { message?: string } })?.data?.message ?? 'Uninstall failed'
-    toast.add({ title: msg, color: 'red' })
-  }
-}
-
-async function toggle(id: string, isActive: boolean) {
-  const action = isActive ? 'disable' : 'enable'
-  try {
-    await $fetch(`/api/v1/plugins/${id}/${action}`, { method: 'POST' })
-    await refresh()
-    await refreshNuxtData('plugin-nav')
-    toast.add({ title: isActive ? 'Plugin disabled' : 'Plugin enabled', color: 'green' })
-  } catch (e: unknown) {
-    const msg = (e as { data?: { message?: string } })?.data?.message ?? 'Action failed'
-    toast.add({ title: msg, color: 'red' })
-  }
-}
 </script>
 
 <template>
   <div class="space-y-6">
     <h1 class="text-xl font-bold text-gray-900 dark:text-white">Plugins</h1>
-
-    <!-- Bundled plugins -->
-    <div class="space-y-3">
-      <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Bundled plugins</h2>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <UCard v-for="plugin in items" :key="plugin.id">
-          <div class="flex items-start justify-between gap-4">
-            <div class="min-w-0">
-              <div class="flex items-center gap-2 mb-0.5">
-                <p class="font-semibold text-gray-900 dark:text-white">{{ plugin.name }}</p>
-                <UBadge :color="plugin.isActive ? 'green' : 'neutral'" variant="soft" size="xs">
-                  {{ plugin.isActive ? 'Active' : plugin.installed ? 'Inactive' : 'Available' }}
-                </UBadge>
-              </div>
-              <p class="text-xs text-gray-400 truncate">{{ plugin.packageName }} @ {{ plugin.version }}</p>
-            </div>
-
-            <div class="flex items-center gap-2 shrink-0">
-              <!-- Not installed -->
-              <UButton v-if="!plugin.installed" size="xs" icon="i-lucide-download" @click="install(plugin.id)">
-                Install
-              </UButton>
-
-              <!-- Installed -->
-              <template v-else>
-                <UButton
-                  size="xs"
-                  :color="plugin.isActive ? 'neutral' : 'primary'"
-                  :icon="plugin.isActive ? 'i-lucide-pause' : 'i-lucide-play'"
-                  :variant="plugin.isActive ? 'outline' : 'solid'"
-                  @click="toggle(plugin.id, plugin.isActive)"
-                >
-                  {{ plugin.isActive ? 'Disable' : 'Enable' }}
-                </UButton>
-                <UButton
-                  size="xs"
-                  color="red"
-                  variant="ghost"
-                  icon="i-lucide-trash-2"
-                  @click="uninstall(plugin.id, plugin.name)"
-                />
-              </template>
-            </div>
-          </div>
-        </UCard>
-      </div>
-    </div>
 
     <!-- Dynamic plugins -->
     <div class="space-y-3">
@@ -238,9 +152,9 @@ async function toggle(id: string, isActive: boolean) {
       </UCard>
     </div>
 
-    <!-- How to add bundled plugins -->
+    <!-- About dynamic plugins -->
     <div class="space-y-3">
-      <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Adding bundled plugins</h2>
+      <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">About dynamic plugins</h2>
 
       <UCard>
         <div class="space-y-4">
@@ -249,35 +163,10 @@ async function toggle(id: string, isActive: boolean) {
               <UIcon name="i-lucide-info" class="w-4 h-4 text-primary-500" />
             </div>
             <div class="space-y-1">
-              <p class="text-sm font-medium text-gray-900 dark:text-white">Bundled plugins are compiled at deploy time</p>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">Dynamic plugins run as isolated Cloudflare Workers</p>
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                For plugins that need deep framework integration (custom content types, admin pages), add them to the codebase and redeploy.
+                Upload a pre-built plugin bundle to add new blocks and server-side functionality without redeploying your site.
               </p>
-            </div>
-          </div>
-
-          <div class="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-2">
-            <div class="flex items-start gap-2">
-              <UBadge color="neutral" variant="soft" size="xs" class="mt-0.5 shrink-0 font-mono">1</UBadge>
-              <div>
-                <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Run the CLI installer:</p>
-                <div class="bg-gray-900 dark:bg-gray-950 rounded-lg px-4 py-2.5 font-mono text-xs text-green-400">
-                  npx nuxflow add @author/plugin-name
-                </div>
-              </div>
-            </div>
-            <div class="flex items-start gap-2">
-              <UBadge color="neutral" variant="soft" size="xs" class="mt-0.5 shrink-0 font-mono">2</UBadge>
-              <div>
-                <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Redeploy:</p>
-                <div class="bg-gray-900 dark:bg-gray-950 rounded-lg px-4 py-2.5 font-mono text-xs text-green-400">
-                  pnpm build &amp;&amp; wrangler deploy
-                </div>
-              </div>
-            </div>
-            <div class="flex items-start gap-2">
-              <UBadge color="neutral" variant="soft" size="xs" class="mt-0.5 shrink-0 font-mono">3</UBadge>
-              <p class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Return here and click <strong>Install</strong> to activate it.</p>
             </div>
           </div>
 

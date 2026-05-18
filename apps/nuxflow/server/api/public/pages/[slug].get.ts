@@ -25,6 +25,18 @@ export default defineEventHandler(async (event) => {
 
   if (!page) throw createError({ statusCode: 404, message: 'Not found' })
 
+  const type = page.typeId
+    ? await db.query.contentTypes.findFirst({
+        where: eq(contentTypes.id, page.typeId),
+        columns: { hasComments: true },
+      })
+    : null
+
+  // Per-item override takes precedence; null means "inherit from content type"
+  const hasComments = page.allowComments !== null && page.allowComments !== undefined
+    ? page.allowComments
+    : (type?.hasComments ?? false)
+
   setHeader(event, 'Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400')
 
   return {
@@ -36,5 +48,6 @@ export default defineEventHandler(async (event) => {
     seoDescription: page.seoDescription,
     ogImage: page.ogImage,
     publishedAt: page.publishedAt,
+    hasComments,
   }
 })

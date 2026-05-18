@@ -5,10 +5,25 @@ type UserRow = { id: string; name: string; email: string; role: string; createdA
 const { data, refresh } = await useFetch<{ users: UserRow[] }>('/api/v1/users')
 const users = computed(() => data.value?.users ?? [])
 
+const { user: currentUser } = useUserSession()
+
 const showInvite = ref(false)
 const inviteForm = reactive({ name: '', email: '', role: 'viewer' as string })
 const inviting = ref(false)
 const inviteError = ref('')
+
+const removingId = ref<string | null>(null)
+
+async function removeUser(userId: string) {
+  if (!confirm('Remove this user from the site?')) return
+  removingId.value = userId
+  try {
+    await $fetch(`/api/v1/users/${userId}`, { method: 'DELETE' })
+    await refresh()
+  } finally {
+    removingId.value = null
+  }
+}
 
 const roleOptions = [
   { label: 'Admin', value: 'admin' },
@@ -40,17 +55,12 @@ async function updateRole(userId: string, role: string) {
   await refresh()
 }
 
-type Color = 'red' | 'orange' | 'blue' | 'green' | 'gray' | 'primary' | 'neutral'
-const roleColor: Record<string, Color> = {
-  super_admin: 'red', admin: 'orange', editor: 'blue',
-  author: 'green', member: 'gray', viewer: 'gray',
-}
-
 const columns = [
   { accessorKey: 'name', header: 'Name' },
   { accessorKey: 'email', header: 'Email' },
   { accessorKey: 'role', header: 'Role' },
   { accessorKey: 'createdAt', header: 'Joined' },
+  { id: 'actions', header: '' },
 ]
 </script>
 
@@ -82,27 +92,31 @@ const columns = [
             class="min-w-28"
             :disabled="row.original.role === 'super_admin'"
             @update:model-value="(val) => updateRole(row.original.id, val as string)"
-          >
-            <template #leading>
-              <UBadge :color="roleColor[row.original.role] ?? 'neutral'" variant="soft" size="xs" class="capitalize mr-1">
-                {{ row.original.role.replace('_', ' ') }}
-              </UBadge>
-            </template>
-          </USelect>
+          />
         </template>
 
         <template #createdAt-cell="{ row }">
           <span class="text-sm text-gray-400">{{ new Date(row.original.createdAt).toLocaleDateString() }}</span>
         </template>
+
+        <template #actions-cell="{ row }">
+          <div class="flex justify-end">
+            <UButton
+              v-if="row.original.role !== 'super_admin' && row.original.id !== currentUser?.id"
+              icon="i-lucide-trash-2"
+              color="red"
+              variant="ghost"
+              size="xs"
+              :loading="removingId === row.original.id"
+              @click="removeUser(row.original.id)"
+            />
+          </div>
+        </template>
       </UTable>
     </UCard>
 
-    <UModal v-model="showInvite">
-      <UCard>
-        <template #header>
-          <p class="text-sm font-semibold">Invite user</p>
-        </template>
-
+    <UModal v-model:open="showInvite" title="Invite user">
+      <template #body>
         <div class="space-y-4">
           <UFormField label="Full name" required>
             <UInput v-model="inviteForm.name" placeholder="Jane Smith" autofocus />
@@ -118,20 +132,20 @@ const columns = [
 
           <p v-if="inviteError" class="text-sm text-red-500">{{ inviteError }}</p>
         </div>
+      </template>
 
-        <template #footer>
-          <div class="flex justify-end gap-2">
-            <UButton variant="ghost" @click="showInvite = false">Cancel</UButton>
-            <UButton
-              :loading="inviting"
-              :disabled="!inviteForm.name || !inviteForm.email"
-              @click="invite"
-            >
-              Send invite
-            </UButton>
-          </div>
-        </template>
-      </UCard>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton variant="ghost" @click="showInvite = false">Cancel</UButton>
+          <UButton
+            :loading="inviting"
+            :disabled="!inviteForm.name || !inviteForm.email"
+            @click="invite"
+          >
+            Send invite
+          </UButton>
+        </div>
+      </template>
     </UModal>
   </div>
 </template>

@@ -15,6 +15,7 @@ const { data: item, refresh } = await useAsyncData(
     title: string; slug: string; status: string; scheduledAt?: string
     content?: unknown; seoTitle?: string; seoDescription?: string
     settings?: Record<string, unknown>
+    allowComments?: boolean | null; typeHasComments?: boolean
   }>(`/api/v1/content/${id.value}`),
   { server: false },
 )
@@ -36,6 +37,7 @@ const form = reactive({
   seoTitle: '',
   seoDescription: '',
   access: 'public' as string,
+  allowComments: null as boolean | null,
 })
 
 // Populate (once) when the async data resolves — works for both SSR hydration
@@ -52,24 +54,17 @@ watch(item, (val) => {
   form.seoTitle = val.seoTitle ?? ''
   form.seoDescription = val.seoDescription ?? ''
   form.access = (val.settings as Record<string, unknown> | null)?.access as string ?? 'public'
+  form.allowComments = val.allowComments ?? null
 }, { immediate: true })
 
 // ── Editor mode (TipTap vs Canvas) ───────────────────────────────────────────
-
-// Reuses nav data already fetched by AdminSidebar (same key = no extra request)
-const { data: pluginsNav } = useFetch('/api/v1/plugins/nav', { key: 'plugin-nav' })
-const canvasEnabled = computed(() =>
-  pluginsNav.value?.navItems?.some((item: { path: string }) => item.path === '/admin/plugins/canvas') ?? false,
-)
 
 const contentIsCanvas = computed(() =>
   (form.content as Record<string, unknown> | null)?.type === 'canvas',
 )
 
-// Editor mode is driven by content type first, plugin status second.
 // We must never mount TipTap when content is canvas — TipTap would corrupt the
 // canvas JSON by emitting an empty doc when it fails to parse the canvas format.
-// canvasEnabled only controls whether the mode-switcher toggle is shown in the UI.
 const editorMode = computed<'tiptap' | 'canvas'>(() =>
   contentIsCanvas.value ? 'canvas' : 'tiptap',
 )
@@ -126,6 +121,7 @@ async function save(overrideStatus?: string) {
       seoTitle: form.seoTitle,
       seoDescription: form.seoDescription,
       settings: { access: form.access },
+      allowComments: form.allowComments,
     }
     if (isNew.value) {
       const result = await $fetch<{ id: string }>('/api/v1/content', {
@@ -175,8 +171,8 @@ onUnmounted(() => clearTimeout(autoSaveTimer))
         </span>
       </div>
       <div class="flex items-center gap-2">
-        <!-- Editor mode switcher — only visible when Canvas plugin is active -->
-        <div v-if="canvasEnabled" class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs">
+        <!-- Editor mode switcher -->
+        <div class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs">
           <button
             class="px-3 py-1.5 flex items-center gap-1.5 transition-colors"
             :class="editorMode === 'tiptap'
@@ -269,6 +265,26 @@ onUnmounted(() => clearTimeout(autoSaveTimer))
           :content-id="isNew ? undefined : id"
           @update:model-value="v => { form.seoTitle = v.seoTitle ?? ''; form.seoDescription = v.seoDescription ?? ''; form.access = v.access ?? 'public' }"
         />
+
+        <UCard v-if="item?.typeHasComments" class="text-sm">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="font-medium">Comments</p>
+              <p class="text-gray-400 text-xs mt-0.5">
+                {{ form.allowComments === null ? 'Inheriting type default (on)' : form.allowComments ? 'Enabled for this post' : 'Disabled for this post' }}
+              </p>
+            </div>
+            <USwitch
+              :model-value="form.allowComments ?? true"
+              @update:model-value="form.allowComments = $event"
+            />
+          </div>
+          <div v-if="form.allowComments !== null" class="mt-2">
+            <UButton variant="ghost" size="xs" class="text-gray-400" @click="form.allowComments = null">
+              Reset to type default
+            </UButton>
+          </div>
+        </UCard>
 
         <EditorTermPicker :content-id="isNew ? undefined : id" />
 

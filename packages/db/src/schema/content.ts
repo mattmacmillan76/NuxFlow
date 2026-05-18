@@ -39,6 +39,7 @@ export const contentItems = sqliteTable('content_items', {
   previewToken: text('preview_token'),
   previewTokenExpiresAt: text('preview_token_expires_at'),
   settings: text('settings', { mode: 'json' }).$type<Record<string, unknown>>(),
+  allowComments: integer('allow_comments', { mode: 'boolean' }),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
 }, (t) => [

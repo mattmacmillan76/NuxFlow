@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
 
 async function applyMigrations(event: H3Event) {
   const storage = useStorage('assets/migrations')
-  const keys = (await storage.getKeys()).filter(k => k.endsWith('.sql')).sort()
+  const keys = (await storage.getKeys()).filter(k => !k.startsWith('meta:')).sort()
   if (!keys.length) return
 
   const db = useDb(event)
@@ -51,7 +51,13 @@ async function applyMigrations(event: H3Event) {
     const content = await storage.getItem<string>(key)
     if (!content) continue
     for (const stmt of content.split('--> statement-breakpoint').map(s => s.trim()).filter(Boolean)) {
-      await db.run(sql.raw(stmt))
+      try {
+        await db.run(sql.raw(stmt))
+      } catch (err) {
+        // Skip statements that were already applied (partial retry after prior failure).
+        if (String(err).toLowerCase().includes('already exists')) continue
+        throw err
+      }
     }
     await db.run(sql`INSERT INTO _nuxflow_migrations (filename) VALUES (${key})`)
     count++

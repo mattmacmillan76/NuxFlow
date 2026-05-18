@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { useDb } from '../../../utils/db'
 import { userSiteRoles, sites } from '@nuxflow/db/schema'
 import { ulid } from 'ulid'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { requireRole } from '../../../utils/permissions'
 import { writeAuditLog } from '../../../utils/audit'
 import { sendEmail, escapeHtml } from '../../../utils/email'
@@ -23,18 +23,34 @@ export default defineEventHandler(async (event) => {
 
   const db = useDb(event)
 
-  const auth = serverAuth(event)
-  const tempPassword = crypto.randomUUID()
-  await auth.api.signUpEmail({
-    body: { name: body.name, email: body.email, password: tempPassword },
-  })
-
-  const newUser = await db.query.users.findFirst({
+  // Check if a user with this email already exists (e.g. previously removed from this site)
+  let existingUser = await db.query.users.findFirst({
     where: (u, { eq }) => eq(u.email, body.email),
     columns: { id: true },
   })
 
-  if (!newUser) throw createError({ statusCode: 500, message: 'Failed to create user' })
+  if (existingUser) {
+    // Check they aren't already a member of this site
+    const alreadyMember = await db.query.userSiteRoles.findFirst({
+      where: and(eq(userSiteRoles.userId, existingUser.id), eq(userSiteRoles.siteId, siteId)),
+    })
+    if (alreadyMember) {
+      throw createError({ statusCode: 409, message: 'This user is already a member of this site' })
+    }
+  } else {
+    const auth = serverAuth(event)
+    const tempPassword = crypto.randomUUID()
+    await auth.api.signUpEmail({
+      body: { name: body.name, email: body.email, password: tempPassword },
+    })
+    existingUser = await db.query.users.findFirst({
+      where: (u, { eq }) => eq(u.email, body.email),
+      columns: { id: true },
+    })
+    if (!existingUser) throw createError({ statusCode: 500, message: 'Failed to create user' })
+  }
+
+  const newUser = existingUser
 
   await db.insert(userSiteRoles).values({
     id: ulid(),
@@ -54,7 +70,7 @@ export default defineEventHandler(async (event) => {
   const site = await db.query.sites.findFirst({ where: eq(sites.id, siteId), columns: { name: true, domain: true } })
   const siteName = escapeHtml(site?.name ?? 'NuxFlow')
   const loginUrl = `https://${escapeHtml(site?.domain ?? 'nuxflow.app')}/login`
-  void sendEmail({
+  void sendEmail(event, {
     to: body.email,
     subject: `You've been invited to ${site?.name ?? 'NuxFlow'}`,
     html: `<p>Hi ${escapeHtml(body.name)},</p><p>You have been invited to join <strong>${siteName}</strong> as <strong>${escapeHtml(body.role)}</strong>.</p><p>Visit <a href="${loginUrl}">${loginUrl}</a> to sign in.</p>`,

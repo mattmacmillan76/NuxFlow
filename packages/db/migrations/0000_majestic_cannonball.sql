@@ -1,3 +1,4 @@
+PRAGMA foreign_keys = OFF;--> statement-breakpoint
 CREATE TABLE `site_settings` (
 	`id` text PRIMARY KEY NOT NULL,
 	`site_id` text NOT NULL,
@@ -324,6 +325,10 @@ CREATE TABLE `dynamic_plugins` (
 	`is_active` integer DEFAULT false NOT NULL,
 	`has_server` integer DEFAULT false NOT NULL,
 	`has_client` integer DEFAULT false NOT NULL,
+	`server_checksum` text,
+	`client_checksum` text,
+	`publisher_public_key` text DEFAULT '' NOT NULL,
+	`signature` text DEFAULT '' NOT NULL,
 	`installed_at` text DEFAULT (datetime('now')) NOT NULL,
 	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
 );
@@ -344,19 +349,6 @@ CREATE TABLE `notifications` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_notifications_user_site` ON `notifications` (`user_id`,`site_id`);--> statement-breakpoint
-CREATE TABLE `plugins` (
-	`id` text PRIMARY KEY NOT NULL,
-	`site_id` text NOT NULL,
-	`package_name` text NOT NULL,
-	`name` text NOT NULL,
-	`version` text NOT NULL,
-	`is_active` integer DEFAULT false NOT NULL,
-	`settings` text,
-	`installed_at` text DEFAULT (datetime('now')) NOT NULL,
-	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `idx_plugins_site` ON `plugins` (`site_id`);--> statement-breakpoint
 CREATE TABLE `rate_limits` (
 	`key` text PRIMARY KEY NOT NULL,
 	`count` integer DEFAULT 0 NOT NULL,

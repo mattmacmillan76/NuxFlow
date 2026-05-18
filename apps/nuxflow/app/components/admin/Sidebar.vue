@@ -8,21 +8,21 @@ const route = useRoute()
 const coreNav = [
   { label: 'Dashboard', to: '/admin', icon: 'i-lucide-layout-dashboard' },
   { label: 'Content', to: '/admin/content', icon: 'i-lucide-file-text' },
+  { label: 'Canvas', to: '/admin/canvas', icon: 'i-lucide-layout-panel-top' },
   { label: 'Taxonomies', to: '/admin/taxonomies', icon: 'i-lucide-tag' },
   { label: 'Comments', to: '/admin/comments', icon: 'i-lucide-message-circle' },
   { label: 'Navigation', to: '/admin/menus', icon: 'i-lucide-navigation' },
   { label: 'Media', to: '/admin/media', icon: 'i-lucide-image' },
   { label: 'Forms', to: '/admin/forms', icon: 'i-lucide-list-checks' },
+  { label: 'Contact Forms', to: '/admin/contact-forms', icon: 'i-lucide-mail' },
   { label: 'Users', to: '/admin/users', icon: 'i-lucide-users' },
+  { label: 'Memberships', to: '/admin/memberships', icon: 'i-lucide-credit-card' },
   { label: 'Themes', to: '/admin/themes', icon: 'i-lucide-palette' },
   { label: 'Plugins', to: '/admin/plugins', icon: 'i-lucide-puzzle' },
   { label: 'SEO', to: '/admin/seo', icon: 'i-lucide-search' },
   { label: 'Import', to: '/admin/import', icon: 'i-lucide-upload' },
   { label: 'Settings', to: '/admin/settings', icon: 'i-lucide-settings' },
 ]
-
-const { data } = useFetch('/api/v1/plugins/nav', { key: 'plugin-nav' })
-const pluginNav = computed(() => data.value?.navItems ?? [])
 
 function isActive(to: string) {
   return route.path === to || (to !== '/admin' && route.path.startsWith(to))
@@ -70,23 +70,6 @@ function isActive(to: string) {
         <span v-if="!collapsed">{{ item.label }}</span>
       </NuxtLink>
 
-      <template v-if="pluginNav.length">
-        <div class="my-2 h-px bg-gray-200 dark:bg-gray-700" :class="collapsed ? 'mx-1' : 'mx-3'" />
-        <NuxtLink
-          v-for="item in pluginNav"
-          :key="item.path"
-          :to="item.path"
-          :title="collapsed ? item.label : undefined"
-          class="flex items-center gap-3 py-2 rounded-xl text-sm font-medium transition-colors"
-          :class="[
-            route.path === item.path || route.path.startsWith(item.path + '/') ? 'nav-active' : 'text-gray-600 hover:bg-black/5 dark:text-gray-400 dark:hover:bg-white/5',
-            collapsed ? 'justify-center px-2' : 'px-3',
-          ]"
-        >
-          <UIcon :name="item.icon" class="w-4 h-4 shrink-0" />
-          <span v-if="!collapsed">{{ item.label }}</span>
-        </NuxtLink>
-      </template>
     </nav>
 
     <!-- User footer -->

@@ -1,6 +1,6 @@
 import { useDb } from '../../../utils/db'
 import { requireAuth } from '../../../utils/permissions'
-import { contentItems } from '@nuxflow/db/schema'
+import { contentItems, contentTypes } from '@nuxflow/db/schema'
 import { and, eq } from 'drizzle-orm'
 
 export default defineEventHandler(async (event) => {
@@ -14,5 +14,11 @@ export default defineEventHandler(async (event) => {
   })
 
   if (!item) throw createError({ statusCode: 404, message: 'Not found' })
-  return item
+
+  const type = await db.query.contentTypes.findFirst({
+    where: eq(contentTypes.id, item.typeId),
+    columns: { hasComments: true },
+  })
+
+  return { ...item, typeHasComments: type?.hasComments ?? false }
 })

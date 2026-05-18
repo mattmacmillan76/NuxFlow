@@ -17,19 +17,6 @@ export const themes = sqliteTable('themes', {
   index('idx_themes_site').on(t.siteId),
 ])
 
-export const plugins = sqliteTable('plugins', {
-  id: text('id').primaryKey(),
-  siteId: text('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
-  packageName: text('package_name').notNull(),
-  name: text('name').notNull(),
-  version: text('version').notNull(),
-  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(false),
-  settings: text('settings', { mode: 'json' }).$type<Record<string, unknown>>(),
-  installedAt: text('installed_at').notNull().default(sql`(datetime('now'))`),
-}, (t) => [
-  index('idx_plugins_site').on(t.siteId),
-])
-
 export const auditLogs = sqliteTable('audit_logs', {
   id: text('id').primaryKey(),
   siteId: text('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),

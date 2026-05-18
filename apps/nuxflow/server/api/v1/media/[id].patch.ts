@@ -6,9 +6,9 @@ import { media } from '@nuxflow/db/schema'
 import { and, eq } from 'drizzle-orm'
 
 const bodySchema = z.object({
-  altText: z.string().max(500).optional(),
-  caption: z.string().max(1000).optional(),
-  folderId: z.string().optional(),
+  altText: z.string().max(500).nullable().optional(),
+  caption: z.string().max(1000).nullable().optional(),
+  folderId: z.string().nullable().optional(),
 })
 
 export default defineEventHandler(async (event) => {

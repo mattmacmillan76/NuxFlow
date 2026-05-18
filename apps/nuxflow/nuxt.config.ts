@@ -10,6 +10,14 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  app: {
+    head: {
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+      ],
+    },
+  },
+
   modules: [
     '@nuxt/ui-pro',
     '@nuxtjs/i18n',
@@ -87,6 +95,7 @@ export default defineNuxtConfig({
     cloudflareAccountId: '',
     cloudflareImagesDeliveryUrl: '',
     emailProvider: 'console',
+    emailFromAddress: '',
     resendApiKey: '',
     brevoApiKey: '',
     zeptoApiKey: '',

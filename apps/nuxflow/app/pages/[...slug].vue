@@ -16,6 +16,7 @@ useSeoMeta({
       {{ page.title }}
     </h1>
     <NuxBlock :content="page.content" />
+    <CommentSection v-if="page.hasComments" :item-id="page.id" />
   </div>
   <div v-else-if="error" class="min-h-[60vh] flex items-center justify-center">
     <div class="text-center">

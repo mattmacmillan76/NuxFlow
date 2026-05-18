@@ -15,6 +15,7 @@ const bodySchema = z.object({
   seoDescription: z.string().max(500).optional(),
   scheduledAt: z.string().datetime().nullish(),
   settings: z.record(z.unknown()).optional(),
+  allowComments: z.boolean().nullable().optional(),
 })
 
 export default defineEventHandler(async (event) => {

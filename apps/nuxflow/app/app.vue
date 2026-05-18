@@ -8,6 +8,14 @@ useHead({
       ? (title ? `${title} | ${name}` : name)
       : (title ?? '')
   },
+  link: computed(() => {
+    const url = siteInfo.value?.faviconUrl
+    if (!url) return []
+    const type = url.endsWith('.svg') ? 'image/svg+xml'
+      : url.endsWith('.ico') ? 'image/x-icon'
+      : 'image/png'
+    return [{ rel: 'icon', type, href: url }]
+  }),
 })
 </script>
 

@@ -81,7 +81,7 @@ export default defineEventHandler(async (event) => {
     })
     const notifyEmail = emailSetting?.value as string | undefined
     if (notifyEmail) {
-      await sendEmail({
+      await sendEmail(event, {
         to: notifyEmail,
         subject: `New contact: ${body.subject || body.name}`,
         html: `<p><strong>From:</strong> ${escapeHtml(body.name)} &lt;${escapeHtml(body.email)}&gt;</p>

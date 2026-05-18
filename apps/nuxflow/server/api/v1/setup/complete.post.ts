@@ -1,10 +1,9 @@
 import { z } from 'zod'
 import type { H3Event } from 'h3'
 import { useDb } from '../../../utils/db'
-import { sites, users, accounts, userSiteRoles, contentTypes, contentItems, taxonomies } from '@nuxflow/db/schema'
+import { sites, users, accounts, userSiteRoles, contentTypes, contentItems, taxonomies, siteSettings } from '@nuxflow/db/schema'
 import { ulid } from 'ulid'
 import { count, eq } from 'drizzle-orm'
-import { rateLimit } from '../../../utils/rate-limit'
 import { hashPassword } from 'better-auth/crypto'
 
 const bodySchema = z.object({
@@ -37,8 +36,6 @@ export default defineEventHandler(async (event) => {
 })
 
 async function _handleSetup(event: H3Event) {
-  await rateLimit(event, { limit: 5, windowMs: 60_000, keyPrefix: 'setup' })
-
   const db = useDb(event)
 
   // Prevent running setup twice
@@ -60,6 +57,14 @@ async function _handleSetup(event: H3Event) {
     timezone: body.site.timezone,
     status: 'active',
     setupCompleted: true,
+  })
+
+  // Seed initial site settings from setup choices
+  await db.insert(siteSettings).values({
+    id: ulid(),
+    siteId,
+    key: 'email.provider',
+    value: body.email?.provider ?? 'console',
   })
 
   // Create admin user directly — bypasses Better Auth's HTTP layer which sets

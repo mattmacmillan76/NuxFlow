@@ -16,7 +16,7 @@ interface NotifyOptions {
   sendEmailNotification?: boolean
 }
 
-export async function sendNotification(opts: NotifyOptions, event?: H3Event) {
+export async function sendNotification(opts: NotifyOptions, event: H3Event) {
   const db = useDb(event)
 
   await db.insert(notifications).values({
@@ -36,7 +36,7 @@ export async function sendNotification(opts: NotifyOptions, event?: H3Event) {
     })
 
     if (user?.email) {
-      await sendEmail({
+      await sendEmail(event, {
         to: user.email,
         subject: opts.title,
         html: `<p>${opts.body}</p>`,

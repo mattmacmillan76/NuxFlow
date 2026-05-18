@@ -48,6 +48,7 @@ auth-wal
 
 # Cloudflare
 .wrangler/
+apps/nuxflow/wrangler.toml
 
 # Claude Code
 .claude/settings.local.json

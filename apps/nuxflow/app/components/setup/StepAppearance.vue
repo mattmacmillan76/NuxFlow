@@ -49,12 +49,12 @@ const templates = [
       </p>
     </div>
 
-    <!-- Template Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <!-- Template List -->
+    <div class="grid grid-cols-1 gap-3">
       <div
         v-for="t in templates"
         :key="t.id"
-        class="relative group rounded-2xl border p-5 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg cursor-pointer flex flex-col justify-between overflow-hidden bg-white dark:bg-gray-900"
+        class="relative group rounded-xl border p-4 transition-all duration-300 hover:scale-[1.01] hover:shadow-md cursor-pointer flex flex-col justify-between overflow-hidden bg-white dark:bg-gray-900"
         :class="templateModel === t.id
           ? 'border-primary-500 ring-2 ring-primary-500 bg-primary-50/20 dark:bg-primary-950/10'
           : 'border-gray-200 dark:border-gray-800 hover:border-primary-400 dark:hover:border-primary-600'"

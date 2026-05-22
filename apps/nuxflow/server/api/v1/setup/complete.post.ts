@@ -3,7 +3,7 @@ import type { H3Event } from 'h3'
 import { useDb } from '../../../utils/db'
 import { sites, users, accounts, userSiteRoles, contentTypes, contentItems, taxonomies, siteSettings } from '@nuxflow/db/schema'
 import { ulid } from 'ulid'
-import { count, eq } from 'drizzle-orm'
+import { count } from 'drizzle-orm'
 import { hashPassword } from 'better-auth/crypto'
 
 const bodySchema = z.object({
@@ -118,8 +118,185 @@ async function _handleSetup(event: H3Event) {
     },
   ])
 
-  // Insert the homepage row synchronously with no content; heavy Canvas
-  // seeding runs after the response via ctx.waitUntil.
+  const sp = { top: 80, right: 24, bottom: 80, left: 24, unit: 'px' as const }
+  const fp = { top: 64, right: 24, bottom: 64, left: 24, unit: 'px' as const }
+
+  let blocks: Record<string, unknown>[] = []
+
+  if (body.template === 'landing') {
+    blocks = [
+      {
+        id: ulid(),
+        type: 'canvas-hero',
+        props: {
+          headline: 'Fast, modern, and beautiful',
+          subtext: `Welcome to ${body.site.name}. We are powered by NuxFlow — the open-source visual CMS optimized for the Cloudflare edge ecosystem.`,
+          ctaLabel: 'Go to dashboard',
+          ctaUrl: '/admin',
+          cta2Label: 'View on GitHub',
+          cta2Url: 'https://github.com/mattmacmillan76/Nuxflow',
+          align: 'center',
+          bgGradient: 'linear-gradient(to bottom right, #030712, #111827, #030712)',
+          textColor: '#ffffff',
+          ctaBgColor: '#00dc82',
+          logoIcon: 'i-lucide-layers',
+          showDecorations: true,
+          padding: sp,
+        },
+      },
+      {
+        id: ulid(),
+        type: 'canvas-features',
+        props: {
+          sectionLabel: 'Why Choose Us',
+          sectionTitle: 'Built for Performance',
+          sectionDesc: 'Everything you need to succeed online, managed right from our fast and robust admin dashboard.',
+          numFeatures: 3,
+          style: 'card',
+          align: 'left',
+          iconColor: '#00dc82',
+          feat1Icon: 'i-lucide-zap',
+          feat1Title: 'Edge Performance',
+          feat1Desc: 'Global distribution with absolute speed. Zero cold starts, running closer to your audience.',
+          feat2Icon: 'i-lucide-layout',
+          feat2Title: 'Visual Canvas Builder',
+          feat2Desc: 'Custom page layouts in seconds. Add, edit, or rearrange sections with no technical experience needed.',
+          feat3Icon: 'i-lucide-shield',
+          feat3Title: 'Ultimate Security',
+          feat3Desc: 'Highly secure edge shielding, sandboxed plugin execution, and robust isolation by default.',
+          gap: 24,
+          padding: { top: 64, right: 24, bottom: 64, left: 24, unit: 'px' as const },
+        },
+      },
+      {
+        id: ulid(),
+        type: 'canvas-cta',
+        props: {
+          headline: 'Ready to grow?',
+          subtext: 'Your workspace is set up and ready to create. Start building your client and portal pages today!',
+          btnLabel: 'Open Admin Dashboard',
+          btnUrl: '/admin',
+          bgColor: '#00dc82',
+          textColor: '#0f172a',
+          btnColor: '#0f172a',
+          padding: fp,
+        },
+      },
+    ]
+  } else if (body.template === 'blog') {
+    blocks = [
+      {
+        id: ulid(),
+        type: 'canvas-hero',
+        props: {
+          headline: 'Welcome to Our Journal',
+          subtext: `Thoughts, ideas, and stories on the latest edge-native technology and publishing trends. Brought to you by ${body.site.name}.`,
+          ctaLabel: 'Read Blog Posts',
+          ctaUrl: '/admin/content?type=post',
+          align: 'center',
+          bgGradient: 'linear-gradient(to bottom right, #064e3b, #022c22, #064e3b)',
+          textColor: '#ffffff',
+          ctaBgColor: '#10b981',
+          logoIcon: 'i-lucide-book-open',
+          showDecorations: true,
+          padding: sp,
+        },
+      },
+      {
+        id: ulid(),
+        type: 'canvas-text',
+        props: {
+          content: `
+            <h2 style="font-size: 1.75rem; font-weight: 800; margin-bottom: 1rem; color: #111827;">Publishing on the Serverless Edge</h2>
+            <p style="font-size: 1.05rem; line-height: 1.7; color: #374151; margin-bottom: 1rem;">
+              This blog template is pre-seeded with NuxFlow. Everything here is running natively on Cloudflare Workers and Turso SQLite database configurations, making it extremely secure, globally distributed, and blisteringly fast.
+            </p>
+            <p style="font-size: 1.05rem; line-height: 1.7; color: #374151;">
+              To customize your homepage or write new articles, head to the admin panel. Your seeded post <strong>"Hello World!"</strong> is already live and editable in the Posts directory index.
+            </p>
+          `,
+          padding: { top: 64, right: 24, bottom: 64, left: 24, unit: 'px' as const },
+        },
+      },
+    ]
+  } else if (body.template === 'portfolio') {
+    blocks = [
+      {
+        id: ulid(),
+        type: 'canvas-hero',
+        props: {
+          headline: 'Building Digital Experiences',
+          subtext: `Hi! I am a creator and developer. This is my professional portfolio showcase where I share my creative web apps and designs. Powered by ${body.site.name}.`,
+          ctaLabel: 'View Projects',
+          ctaUrl: '/admin',
+          align: 'left',
+          bgGradient: 'linear-gradient(to bottom right, #1e1b4b, #311042, #1e1b4b)',
+          textColor: '#ffffff',
+          ctaBgColor: '#d946ef',
+          logoIcon: 'i-lucide-palette',
+          showDecorations: true,
+          padding: sp,
+        },
+      },
+      {
+        id: ulid(),
+        type: 'canvas-features',
+        props: {
+          sectionLabel: 'Selected Projects',
+          sectionTitle: 'My Work & Showcase',
+          sectionDesc: 'Take a look at some of my recent digital works, UI designs, and web applications.',
+          numFeatures: 3,
+          style: 'card',
+          align: 'left',
+          iconColor: '#d946ef',
+          feat1Icon: 'i-lucide-globe',
+          feat1Title: 'Web App Design',
+          feat1Desc: 'Interactive client web applications built using Nuxt 4, Vue 3, and rich micro-animations.',
+          feat2Icon: 'i-lucide-smartphone',
+          feat2Title: 'Mobile Interfaces',
+          feat2Desc: 'Pixel-perfect mobile viewports and native layout optimizations for handheld screens.',
+          feat3Icon: 'i-lucide-sparkles',
+          feat3Title: 'Visual Page Canvas',
+          feat3Desc: 'Bespoke components designed to allow instant visual updates via Canvas editors.',
+          gap: 24,
+          padding: { top: 64, right: 24, bottom: 64, left: 24, unit: 'px' as const },
+        },
+      },
+      {
+        id: ulid(),
+        type: 'canvas-cta',
+        props: {
+          headline: 'Work with me',
+          subtext: 'I am always open to discussing new opportunities, custom web designs, or client applications.',
+          btnLabel: 'Get in Touch',
+          btnUrl: '/admin',
+          bgColor: '#faf5ff',
+          textColor: '#3b0764',
+          btnColor: '#3b0764',
+          padding: fp,
+        },
+      },
+    ]
+  } else {
+    // blank template
+    blocks = [
+      {
+        id: ulid(),
+        type: 'canvas-text',
+        props: {
+          content: `
+            <h1 style="font-size: 2.5rem; font-weight: 800; text-align: center; margin-top: 4rem; margin-bottom: 1rem; color: #111827;">Welcome to your blank canvas</h1>
+            <p style="text-align: center; color: #4b5563; max-width: 600px; margin: 0 auto; line-height: 1.6; font-size: 1.1rem;">
+              Your site is set up cleanly with NuxFlow. Double-click here to start editing this section or add more Canvas blocks from the toolbar below.
+            </p>
+          `,
+          padding: { top: 80, right: 24, bottom: 80, left: 24, unit: 'px' as const },
+        },
+      },
+    ]
+  }
+
+  // Insert the homepage row synchronously with populated Canvas content blocks
   const homepageId = ulid()
   const siteName = body.site.name
   await db.insert(contentItems).values({
@@ -131,7 +308,10 @@ async function _handleSetup(event: H3Event) {
     title: siteName,
     status: 'published',
     visibility: 'public',
-    content: null,
+    content: {
+      type: 'canvas',
+      blocks,
+    },
     seoTitle: siteName,
     seoDescription: `Welcome to ${siteName}`,
     publishedAt: new Date().toISOString(),
@@ -166,202 +346,6 @@ async function _handleSetup(event: H3Event) {
       seoDescription: 'This is the first seeded post on your new edge-native blog.',
       publishedAt: new Date().toISOString(),
     })
-  }
-
-  async function seedCanvasContent() {
-    const sp = { top: 80, right: 24, bottom: 80, left: 24, unit: 'px' as const }
-    const fp = { top: 64, right: 24, bottom: 64, left: 24, unit: 'px' as const }
-
-    let blocks: Record<string, unknown>[] = []
-
-    if (body.template === 'landing') {
-      blocks = [
-        {
-          id: ulid(),
-          type: 'canvas-hero',
-          props: {
-            headline: 'Fast, modern, and beautiful',
-            subtext: `Welcome to ${siteName}. We are powered by NuxFlow — the open-source visual CMS optimized for the Cloudflare edge ecosystem.`,
-            ctaLabel: 'Go to dashboard',
-            ctaUrl: '/admin',
-            cta2Label: 'View on GitHub',
-            cta2Url: 'https://github.com/mattmacmillan76/Nuxflow',
-            align: 'center',
-            bgGradient: 'linear-gradient(to bottom right, #030712, #111827, #030712)',
-            textColor: '#ffffff',
-            ctaBgColor: '#00dc82',
-            logoIcon: 'i-lucide-layers',
-            showDecorations: true,
-            padding: sp,
-          },
-        },
-        {
-          id: ulid(),
-          type: 'canvas-features',
-          props: {
-            sectionLabel: 'Why Choose Us',
-            sectionTitle: 'Built for Performance',
-            sectionDesc: 'Everything you need to succeed online, managed right from our fast and robust admin dashboard.',
-            numFeatures: 3,
-            style: 'card',
-            align: 'left',
-            iconColor: '#00dc82',
-            feat1Icon: 'i-lucide-zap',
-            feat1Title: 'Edge Performance',
-            feat1Desc: 'Global distribution with absolute speed. Zero cold starts, running closer to your audience.',
-            feat2Icon: 'i-lucide-layout',
-            feat2Title: 'Visual Canvas Builder',
-            feat2Desc: 'Custom page layouts in seconds. Add, edit, or rearrange sections with no technical experience needed.',
-            feat3Icon: 'i-lucide-shield',
-            feat3Title: 'Ultimate Security',
-            feat3Desc: 'Highly secure edge shielding, sandboxed plugin execution, and robust isolation by default.',
-            gap: 24,
-            padding: { top: 64, right: 24, bottom: 64, left: 24, unit: 'px' as const },
-          },
-        },
-        {
-          id: ulid(),
-          type: 'canvas-cta',
-          props: {
-            headline: 'Ready to grow?',
-            subtext: 'Your workspace is set up and ready to create. Start building your client and portal pages today!',
-            btnLabel: 'Open Admin Dashboard',
-            btnUrl: '/admin',
-            bgColor: '#00dc82',
-            textColor: '#0f172a',
-            btnColor: '#0f172a',
-            padding: fp,
-          },
-        },
-      ]
-    } else if (body.template === 'blog') {
-      blocks = [
-        {
-          id: ulid(),
-          type: 'canvas-hero',
-          props: {
-            headline: 'Welcome to Our Journal',
-            subtext: `Thoughts, ideas, and stories on the latest edge-native technology and publishing trends. Brought to you by ${siteName}.`,
-            ctaLabel: 'Read Blog Posts',
-            ctaUrl: '/admin/content?type=post',
-            align: 'center',
-            bgGradient: 'linear-gradient(to bottom right, #064e3b, #022c22, #064e3b)',
-            textColor: '#ffffff',
-            ctaBgColor: '#10b981',
-            logoIcon: 'i-lucide-book-open',
-            showDecorations: true,
-            padding: sp,
-          },
-        },
-        {
-          id: ulid(),
-          type: 'canvas-text',
-          props: {
-            content: `
-              <h2 style="font-size: 1.75rem; font-weight: 800; margin-bottom: 1rem; color: #111827;">Publishing on the Serverless Edge</h2>
-              <p style="font-size: 1.05rem; line-height: 1.7; color: #374151; margin-bottom: 1rem;">
-                This blog template is pre-seeded with NuxFlow. Everything here is running natively on Cloudflare Workers and Turso SQLite database configurations, making it extremely secure, globally distributed, and blisteringly fast.
-              </p>
-              <p style="font-size: 1.05rem; line-height: 1.7; color: #374151;">
-                To customize your homepage or write new articles, head to the admin panel. Your seeded post <strong>"Hello World!"</strong> is already live and editable in the Posts directory index.
-              </p>
-            `,
-            padding: { top: 64, right: 24, bottom: 64, left: 24, unit: 'px' as const },
-          },
-        },
-      ]
-    } else if (body.template === 'portfolio') {
-      blocks = [
-        {
-          id: ulid(),
-          type: 'canvas-hero',
-          props: {
-            headline: 'Building Digital Experiences',
-            subtext: `Hi! I am a creator and developer. This is my professional portfolio showcase where I share my creative web apps and designs. Powered by ${siteName}.`,
-            ctaLabel: 'View Projects',
-            ctaUrl: '/admin',
-            align: 'left',
-            bgGradient: 'linear-gradient(to bottom right, #1e1b4b, #311042, #1e1b4b)',
-            textColor: '#ffffff',
-            ctaBgColor: '#d946ef',
-            logoIcon: 'i-lucide-palette',
-            showDecorations: true,
-            padding: sp,
-          },
-        },
-        {
-          id: ulid(),
-          type: 'canvas-features',
-          props: {
-            sectionLabel: 'Selected Projects',
-            sectionTitle: 'My Work & Showcase',
-            sectionDesc: 'Take a look at some of my recent digital works, UI designs, and web applications.',
-            numFeatures: 3,
-            style: 'card',
-            align: 'left',
-            iconColor: '#d946ef',
-            feat1Icon: 'i-lucide-globe',
-            feat1Title: 'Web App Design',
-            feat1Desc: 'Interactive client web applications built using Nuxt 4, Vue 3, and rich micro-animations.',
-            feat2Icon: 'i-lucide-smartphone',
-            feat2Title: 'Mobile Interfaces',
-            feat2Desc: 'Pixel-perfect mobile viewports and native layout optimizations for handheld screens.',
-            feat3Icon: 'i-lucide-sparkles',
-            feat3Title: 'Visual Page Canvas',
-            feat3Desc: 'Bespoke components designed to allow instant visual updates via Canvas editors.',
-            gap: 24,
-            padding: { top: 64, right: 24, bottom: 64, left: 24, unit: 'px' as const },
-          },
-        },
-        {
-          id: ulid(),
-          type: 'canvas-cta',
-          props: {
-            headline: 'Work with me',
-            subtext: 'I am always open to discussing new opportunities, custom web designs, or client applications.',
-            btnLabel: 'Get in Touch',
-            btnUrl: '/admin',
-            bgColor: '#faf5ff',
-            textColor: '#3b0764',
-            btnColor: '#3b0764',
-            padding: fp,
-          },
-        },
-      ]
-    } else {
-      // blank template
-      blocks = [
-        {
-          id: ulid(),
-          type: 'canvas-text',
-          props: {
-            content: `
-              <h1 style="font-size: 2.5rem; font-weight: 800; text-align: center; margin-top: 4rem; margin-bottom: 1rem; color: #111827;">Welcome to your blank canvas</h1>
-              <p style="text-align: center; color: #4b5563; max-width: 600px; margin: 0 auto; line-height: 1.6; font-size: 1.1rem;">
-                Your site is set up cleanly with NuxFlow. Double-click here to start editing this section or add more Canvas blocks from the toolbar below.
-              </p>
-            `,
-            padding: { top: 80, right: 24, bottom: 80, left: 24, unit: 'px' as const },
-          },
-        },
-      ]
-    }
-
-    await db.update(contentItems)
-      .set({
-        content: {
-          type: 'canvas',
-          blocks,
-        },
-      })
-      .where(eq(contentItems.id, homepageId))
-  }
-
-  const cfCtx = event.context.cloudflare?.ctx
-  if (cfCtx) {
-    cfCtx.waitUntil(seedCanvasContent())
-  } else {
-    await seedCanvasContent()
   }
 
   // Seed default taxonomies

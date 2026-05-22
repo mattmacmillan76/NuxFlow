@@ -29,7 +29,7 @@ test.describe('NuxFlow User Authentication', () => {
       // Step 3: Email Settings
       await page.locator('button:has-text("Continue")').click()
 
-      // Step 4: Appearance / Finish
+      // Step 4: Template / Finish
       await page.locator('button:has-text("Finish setup")').click()
 
       // Now navigate to login

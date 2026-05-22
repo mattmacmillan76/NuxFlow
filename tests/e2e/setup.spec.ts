@@ -46,8 +46,8 @@ test.describe('NuxFlow Setup & Onboarding', () => {
       await expect(page.locator('h2')).toContainText('Email settings')
       await page.locator('button:has-text("Continue")').click()
 
-      // Step 4: Appearance / Finish
-      await expect(page.locator('h2')).toContainText('Appearance')
+      // Step 4: Template / Finish
+      await expect(page.locator('h2')).toContainText('Choose a Starter Template')
       await page.locator('button:has-text("Finish setup")').click()
 
       // Step 5: Setup Done / Redirect

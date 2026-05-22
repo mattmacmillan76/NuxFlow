@@ -8,6 +8,7 @@ const form = reactive({
   site: { name: '', domain: '', locale: 'en', timezone: 'UTC' },
   admin: { name: '', email: '', password: '' },
   email: { provider: 'console' as const },
+  template: 'landing',
 })
 
 const loading = ref(false)
@@ -17,7 +18,7 @@ const steps = [
   { id: 1, label: 'Site details', icon: 'i-lucide-globe' },
   { id: 2, label: 'Admin account', icon: 'i-lucide-user' },
   { id: 3, label: 'Email settings', icon: 'i-lucide-mail' },
-  { id: 4, label: 'Appearance', icon: 'i-lucide-palette' },
+  { id: 4, label: 'Template', icon: 'i-lucide-layout' },
   { id: 5, label: 'All done!', icon: 'i-lucide-check-circle' },
 ]
 
@@ -39,7 +40,7 @@ async function complete() {
     try {
       await $fetch('/api/v1/setup/complete', {
         method: 'POST',
-        body: { site: form.site, admin: form.admin, email: form.email },
+        body: { site: form.site, admin: form.admin, email: form.email, template: form.template },
       })
       clearNuxtData('/api/v1/setup/status')
     } catch (e: unknown) {
@@ -102,7 +103,7 @@ async function complete() {
       <SetupStepSite v-if="step === 1" v-model="form.site" @next="next" />
       <SetupStepAdmin v-else-if="step === 2" v-model="form.admin" @next="next" @back="back" />
       <SetupStepEmail v-else-if="step === 3" v-model="form.email" @next="next" @back="back" />
-      <SetupStepAppearance v-else-if="step === 4" :loading="loading" :error="error" @next="complete" @back="back" />
+      <SetupStepAppearance v-else-if="step === 4" v-model="form.template" :loading="loading" :error="error" @next="complete" @back="back" />
       <SetupStepDone v-else-if="step === 5" />
     </div>
   </div>

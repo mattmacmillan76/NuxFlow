@@ -307,8 +307,12 @@ Open `http://localhost:3000/setup` — the onboarding wizard walks through the r
 # Log in to Cloudflare
 wrangler login
 
-# Create the D1 database and note the returned database_id
+# Create the D1 database and copy the returned database_id into wrangler.toml
 wrangler d1 create nuxflow
+
+# Create the dynamic plugin/theme KV namespaces and copy the returned ids into wrangler.toml
+wrangler kv namespace create PLUGIN_KV
+wrangler kv namespace create PLUGIN_KV --preview
 
 # Apply migrations (run from apps/nuxflow/)
 wrangler d1 execute nuxflow --remote --file=../../packages/db/migrations/0000_confused_blackheart.sql

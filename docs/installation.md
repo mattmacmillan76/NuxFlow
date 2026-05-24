@@ -149,7 +149,27 @@ database_name = "nuxflow"
 database_id = "YOUR_DATABASE_ID_HERE"
 ```
 
-### Step 3: Build and Deploy
+### Step 3: Create the KV Namespace
+
+NuxFlow uses a Cloudflare KV namespace to store dynamic plugin bundles and active theme stylesheets. You **must** create these before deploying.
+
+Run these two commands from the `apps/nuxflow` directory (the first creates your production namespace, the second creates a local preview namespace):
+
+```bash
+wrangler kv namespace create PLUGIN_KV
+wrangler kv namespace create PLUGIN_KV --preview
+```
+
+Wrangler will print a snippet for each command containing an `id` value. Copy and paste these into the `[[kv_namespaces]]` block in `apps/nuxflow/wrangler.toml`:
+
+```toml
+[[kv_namespaces]]
+binding = "PLUGIN_KV"
+id = "YOUR_KV_ID_FROM_FIRST_COMMAND"
+preview_id = "YOUR_PREVIEW_ID_FROM_SECOND_COMMAND"
+```
+
+### Step 4: Build and Deploy
 
 Return to the repo root, build, then deploy:
 
@@ -161,7 +181,7 @@ pnpm --filter @nuxflow/app run deploy
 
 Database migrations run automatically on the first request after deployment. There is nothing else to run.
 
-### Step 4: Add Production Secrets
+### Step 5: Add Production Secrets
 
 With the worker now deployed, add your runtime secrets. Wrangler will prompt you to type or paste the value — it is never passed as a command-line argument:
 

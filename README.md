@@ -231,7 +231,15 @@ cd nuxflow
 pnpm install
 ```
 
-### 2. Configure the database
+### 2. Copy Wrangler Configuration
+
+NuxFlow uses Wrangler for local development and deployment. Copy the example wrangler configuration inside the app folder:
+
+```bash
+cp apps/nuxflow/wrangler.toml.example apps/nuxflow/wrangler.toml
+```
+
+### 3. Configure the database
 
 NuxFlow uses **Cloudflare D1** by default (recommended). A local SQLite file via Turso is available as a zero-account alternative for development.
 
@@ -262,7 +270,7 @@ turso db tokens create nuxflow-dev    # copy the token
 
 Then set `NUXT_TURSO_URL` and `NUXT_TURSO_AUTH_TOKEN` in your `.env` file and remove the `[[d1_databases]]` block from `wrangler.toml`.
 
-### 3. Configure environment
+### 4. Configure environment
 
 ```bash
 cp apps/nuxflow/.env.example apps/nuxflow/.env
@@ -277,7 +285,7 @@ NUXT_PUBLIC_SITE_URL=http://localhost:3000
 
 See [Environment Variables](#environment-variables) for the full reference.
 
-### 4. Start the dev server
+### 5. Start the dev server
 
 ```bash
 pnpm dev

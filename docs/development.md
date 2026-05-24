@@ -46,6 +46,14 @@ cd nuxflow
 pnpm install
 ```
 
+### Copy Wrangler Configuration
+
+NuxFlow uses Wrangler for local development and edge deployment. Copy the example wrangler config file inside the app folder:
+
+```bash
+cp apps/nuxflow/wrangler.toml.example apps/nuxflow/wrangler.toml
+```
+
 ### Choose a Local Database
 
 **Option A — Cloudflare D1 via `wrangler dev` (recommended):**

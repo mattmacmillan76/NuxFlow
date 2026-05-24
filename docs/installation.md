@@ -114,14 +114,14 @@ Database migrations run automatically on the first request. Visit `http://localh
 NuxFlow deploys as a **Cloudflare Worker** using the `cloudflare-module` Nitro preset. The `wrangler.toml` in `apps/nuxflow` is pre-configured with D1 as the default database.
 
 > [!IMPORTANT]
-> **Local `.env` Required for Building:**
-> Even when deploying to Cloudflare (where production secrets are set via Wrangler), you **must** have a local `.env` file inside `apps/nuxflow/.env` before running the build command. The compiler (Vite/Nuxt) validates schemas at compile time and will crash if `NUXT_BETTER_AUTH_SECRET` is missing.
-> 
-> If you skipped the local development steps, simply copy the example configuration first:
-> ```bash
-> cp apps/nuxflow/.env.example apps/nuxflow/.env
-> ```
-> *(You can leave the default placeholder values as is; they are only used to satisfy the build-time compiler schemas.)*
+> **Local Build Requirements:**
+> Even when deploying straight to Cloudflare, the build compilation runs on your local machine before being uploaded. Therefore, you **must** do the following before running `pnpm build`:
+> 1. **Install Dependencies:** If you skipped the local development steps, ensure you have run `pnpm install` in the repository root directory.
+> 2. **Local `.env` File:** You must copy the example configuration:
+>    ```bash
+>    cp apps/nuxflow/.env.example apps/nuxflow/.env
+>    ```
+>    *(The build compiler validates environment schemas at compile time and will crash if `NUXT_BETTER_AUTH_SECRET` is missing. You can leave the placeholder values as is.)*
 
 ### Step 1: Log In to Cloudflare
 

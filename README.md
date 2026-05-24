@@ -300,8 +300,10 @@ Open `http://localhost:3000/setup` — the onboarding wizard walks through the r
 ### Cloudflare Workers
 
 > [!IMPORTANT]
-> **Local `.env` Required for Building:**
-> Even when deploying to Cloudflare, you **must** copy the example env file (`cp apps/nuxflow/.env.example apps/nuxflow/.env`) before running `pnpm build`. The build compiler validates schemas at compile time and will fail if `NUXT_BETTER_AUTH_SECRET` is undefined.
+> **Local Build Requirements:**
+> Even when deploying straight to Cloudflare, the build compilation runs on your local machine before upload. You **must** do the following before running `pnpm build`:
+> 1. **Install Dependencies:** If you skipped local dev, run `pnpm install` in the root folder.
+> 2. **Local `.env` File:** Copy the example configuration (`cp apps/nuxflow/.env.example apps/nuxflow/.env`) to satisfy build-time schemas.
 
 ```bash
 # Log in to Cloudflare

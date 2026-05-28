@@ -30,7 +30,7 @@ export const SECRET_MASK = '••••••••••••••••'
 /**
  * Resolves a site setting. Checks the database first, decrypts if sensitive, and falls back to environment variables.
  */
-export async function resolveSetting(event: H3Event, key: string, envKey?: string): Promise<any> {
+export async function resolveSetting(event: H3Event, key: string, envKey?: string): Promise<unknown> {
   const siteId = event.context.siteId as string | undefined
   const rc = useRuntimeConfig()
 

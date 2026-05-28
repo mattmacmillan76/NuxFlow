@@ -69,13 +69,13 @@ export async function decryptText(ciphertextWithIv: string, secret: string): Pro
 
     const key = await getEncryptionKey(secret)
     const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: iv as any },
+      { name: 'AES-GCM', iv },
       key,
-      ciphertext as any
+      ciphertext
     )
 
     return DECODER.decode(decrypted)
-  } catch (e) {
+  } catch {
     throw new Error('Failed to decrypt data: key mismatch or corrupted ciphertext')
   }
 }

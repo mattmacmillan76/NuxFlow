@@ -2,11 +2,18 @@ import type { AiProvider, AiCompletionOptions } from './index'
 
 export class OllamaProvider implements AiProvider {
   readonly name = 'ollama'
+  private customUrl?: string
+  private customModel?: string
 
-  private get baseUrl() { return process.env.OLLAMA_URL ?? 'http://localhost:11434' }
-  private get model() { return process.env.OLLAMA_MODEL ?? 'llama3.2' }
+  constructor(customUrl?: string, customModel?: string) {
+    this.customUrl = customUrl
+    this.customModel = customModel
+  }
 
-  isConfigured(): boolean { return !!(process.env.OLLAMA_URL || process.env.OLLAMA_MODEL) }
+  private get baseUrl() { return this.customUrl || process.env.OLLAMA_URL || 'http://localhost:11434' }
+  private get model() { return this.customModel || process.env.OLLAMA_MODEL || 'llama3.2' }
+
+  isConfigured(): boolean { return !!(this.baseUrl || this.model) }
 
   async complete(prompt: string, opts: AiCompletionOptions = {}): Promise<string> {
     const fullPrompt = opts.systemPrompt ? `${opts.systemPrompt}\n\n${prompt}` : prompt

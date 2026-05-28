@@ -1,7 +1,5 @@
 import type { H3Event } from 'h3'
-import { useDb } from './db'
-import { siteSettings } from '@nuxflow/db/schema'
-import { and, eq, inArray } from 'drizzle-orm'
+import { resolveSetting } from './settings'
 
 const HTML_ESCAPE_MAP: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 
@@ -29,54 +27,17 @@ interface EmailConfig {
   smtpPass?: string
 }
 
-const EMAIL_SETTING_KEYS = [
-  'email.provider',
-  'email.from_address',
-  'email.resend_api_key',
-  'email.brevo_api_key',
-  'email.zepto_api_key',
-  'email.smtp_host',
-  'email.smtp_port',
-  'email.smtp_user',
-  'email.smtp_pass',
-]
-
 async function loadEmailConfig(event: H3Event): Promise<EmailConfig> {
-  const rc = useRuntimeConfig() as Record<string, string>
-  const siteId = event.context.siteId as string | undefined
-
-  const dbSettings: Record<string, string> = {}
-  if (siteId) {
-    try {
-      const db = useDb(event)
-      const rows = await db.query.siteSettings.findMany({
-        where: and(
-          eq(siteSettings.siteId, siteId),
-          inArray(siteSettings.key, EMAIL_SETTING_KEYS),
-        ),
-        columns: { key: true, value: true },
-      })
-      for (const row of rows) {
-        if (row.value != null) dbSettings[row.key] = row.value as string
-      }
-    } catch {
-      // Fall through to runtimeConfig only
-    }
-  }
-
-  const get = (dbKey: string, rcKey: string) =>
-    dbSettings[dbKey] || (rc[rcKey] as string | undefined) || ''
-
   return {
-    emailProvider: dbSettings['email.provider'] || rc.emailProvider || 'console',
-    fromAddress: dbSettings['email.from_address'] || rc.emailFromAddress || '',
-    resendApiKey: get('email.resend_api_key', 'resendApiKey'),
-    brevoApiKey: get('email.brevo_api_key', 'brevoApiKey'),
-    zeptoApiKey: get('email.zepto_api_key', 'zeptoApiKey'),
-    smtpHost: get('email.smtp_host', 'smtpHost'),
-    smtpPort: get('email.smtp_port', 'smtpPort'),
-    smtpUser: get('email.smtp_user', 'smtpUser'),
-    smtpPass: get('email.smtp_pass', 'smtpPass'),
+    emailProvider: await resolveSetting(event, 'email.provider', 'emailProvider') || 'console',
+    fromAddress: await resolveSetting(event, 'email.from_address', 'emailFromAddress'),
+    resendApiKey: await resolveSetting(event, 'email.resend_api_key', 'resendApiKey'),
+    brevoApiKey: await resolveSetting(event, 'email.brevo_api_key', 'brevoApiKey'),
+    zeptoApiKey: await resolveSetting(event, 'email.zepto_api_key', 'zeptoApiKey'),
+    smtpHost: await resolveSetting(event, 'email.smtp_host', 'smtpHost'),
+    smtpPort: await resolveSetting(event, 'email.smtp_port', 'smtpPort'),
+    smtpUser: await resolveSetting(event, 'email.smtp_user', 'smtpUser'),
+    smtpPass: await resolveSetting(event, 'email.smtp_pass', 'smtpPass'),
   }
 }
 

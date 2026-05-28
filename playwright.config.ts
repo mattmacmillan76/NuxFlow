@@ -24,7 +24,7 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
+  webServer: process.env.TEST_BASE_URL ? undefined : {
     command: 'pnpm dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,

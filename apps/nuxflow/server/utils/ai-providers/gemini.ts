@@ -2,11 +2,16 @@ import type { AiProvider, AiCompletionOptions } from './index'
 
 export class GeminiProvider implements AiProvider {
   readonly name = 'gemini'
+  private apiKey?: string
 
-  isConfigured(): boolean { return !!(process.env.GEMINI_API_KEY) }
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey
+  }
+
+  isConfigured(): boolean { return !!(this.apiKey || process.env.GEMINI_API_KEY) }
 
   async complete(prompt: string, opts: AiCompletionOptions = {}): Promise<string> {
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = this.apiKey || process.env.GEMINI_API_KEY
     const model = 'gemini-1.5-flash'
     const contents = opts.systemPrompt
       ? [{ role: 'user', parts: [{ text: opts.systemPrompt + '\n\n' + prompt }] }]

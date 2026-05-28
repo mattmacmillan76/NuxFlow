@@ -242,7 +242,7 @@ async function deleteSite() {
         <!-- General -->
         <template v-if="active === 'General'">
           <UCard>
-            <template #header><p class="text-sm font-semibold">General settings</p></template>
+            <template #header><p class="text-sm font-semibold text-gray-900 dark:text-white">General settings</p></template>
             <div class="space-y-4">
               <UFormField label="Site name">
                 <UInput v-model="general.name" placeholder="My Site" />
@@ -276,7 +276,7 @@ async function deleteSite() {
         <!-- Appearance -->
         <template v-if="active === 'Appearance'">
           <UCard>
-            <template #header><p class="text-sm font-semibold">Favicon</p></template>
+            <template #header><p class="text-sm font-semibold text-gray-900 dark:text-white">Favicon</p></template>
             <div class="space-y-4">
               <p class="text-sm text-gray-500 dark:text-gray-400">The icon shown in browser tabs and bookmarks. Upload a square PNG, SVG, or ICO file — 256×256 px or larger recommended.</p>
 
@@ -314,7 +314,7 @@ async function deleteSite() {
           </UCard>
 
           <UCard>
-            <template #header><p class="text-sm font-semibold">Frontend header</p></template>
+            <template #header><p class="text-sm font-semibold text-gray-900 dark:text-white">Frontend header</p></template>
             <div class="space-y-5">
               <div class="flex items-start justify-between gap-4">
                 <div>
@@ -342,7 +342,7 @@ async function deleteSite() {
         <!-- Email -->
         <template v-if="active === 'Email'">
           <UCard>
-            <template #header><p class="text-sm font-semibold">Email delivery</p></template>
+            <template #header><p class="text-sm font-semibold text-gray-900 dark:text-white">Email delivery</p></template>
             <div class="space-y-4">
               <UFormField label="Provider">
                 <USelect v-model="email.provider" :items="emailProviderOptions" class="w-full" />
@@ -430,7 +430,7 @@ async function deleteSite() {
         <!-- Integrations -->
         <template v-if="active === 'Integrations'">
           <UCard>
-            <template #header><p class="text-sm font-semibold">Cloudflare Turnstile</p></template>
+            <template #header><p class="text-sm font-semibold text-gray-900 dark:text-white">Cloudflare Turnstile</p></template>
             <div class="space-y-4">
               <UFormField label="Site key" hint="Public key shown to visitors">
                 <UInput v-model="integrations.turnstileSiteKey" placeholder="0x4AAA…" />
@@ -442,7 +442,7 @@ async function deleteSite() {
           </UCard>
 
           <UCard>
-            <template #header><p class="text-sm font-semibold">Analytics</p></template>
+            <template #header><p class="text-sm font-semibold text-gray-900 dark:text-white">Analytics</p></template>
             <div class="space-y-4">
               <UFormField label="Google Analytics measurement ID" hint="e.g. G-XXXXXXXXXX">
                 <UInput v-model="integrations.analyticsId" placeholder="G-XXXXXXXXXX" />

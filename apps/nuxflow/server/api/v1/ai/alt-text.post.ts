@@ -11,7 +11,7 @@ const SYSTEM = `You are an accessibility expert. Write concise, descriptive alt 
 
 export default defineEventHandler(async (event) => {
   await requireAuth(event)
-  const ai = getAiProvider()
+  const ai = await getAiProvider(event)
   if (!ai) throw createError({ statusCode: 503, message: 'No AI provider configured' })
 
   const { mediaId } = await readValidatedBody(event, bodySchema.parse)

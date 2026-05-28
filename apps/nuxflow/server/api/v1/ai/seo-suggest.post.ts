@@ -11,7 +11,7 @@ const SYSTEM = `You are an SEO expert. Return ONLY valid JSON with keys "title" 
 
 export default defineEventHandler(async (event) => {
   await requireAuth(event)
-  const ai = getAiProvider()
+  const ai = await getAiProvider(event)
   if (!ai) throw createError({ statusCode: 503, message: 'No AI provider configured' })
 
   const { title, body } = await readValidatedBody(event, bodySchema.parse)

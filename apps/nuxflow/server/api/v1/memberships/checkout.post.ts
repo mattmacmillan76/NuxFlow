@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { membershipTiers } from '@nuxflow/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { useDb } from '../../../utils/db'
+import { resolveSetting } from '../../../utils/settings'
 import { StripeProvider } from '@nuxflow/plugin-payments/providers/stripe'
 import { LemonSqueezyProvider } from '@nuxflow/plugin-payments/providers/lemonsqueezy'
 
@@ -27,9 +28,15 @@ export default defineEventHandler(async (event) => {
   const userEmail = session.user.email as string
   const userName = (session.user.name ?? '') as string
 
-  if (config.stripeSecretKey) {
+  // Resolve payment integration keys dynamically (per-tenant override of env variables)
+  const stripeSecretKey = await resolveSetting(event, 'payments.stripe_secret_key', 'stripeSecretKey')
+  const lsApiKey = await resolveSetting(event, 'payments.ls_api_key', 'lsApiKey')
+  const lsStoreId = await resolveSetting(event, 'payments.ls_store_id', 'lsStoreId')
+  const paddleApiKey = await resolveSetting(event, 'payments.paddle_api_key', 'paddleApiKey')
+
+  if (stripeSecretKey) {
     if (!tier.stripePriceId) throw createError({ statusCode: 409, message: 'This tier has not been synced to Stripe' })
-    const stripe = new StripeProvider(config.stripeSecretKey as string)
+    const stripe = new StripeProvider(stripeSecretKey as string)
     const customers = await stripe.listCustomersByEmail(userEmail)
     let customerId = customers[0]?.id
     if (!customerId) {
@@ -46,9 +53,9 @@ export default defineEventHandler(async (event) => {
     return { url: checkoutSession.url }
   }
 
-  if (config.lsApiKey && config.lsStoreId) {
+  if (lsApiKey && lsStoreId) {
     if (!tier.lsVariantId) throw createError({ statusCode: 409, message: 'This tier has not been synced to Lemon Squeezy' })
-    const ls = new LemonSqueezyProvider(config.lsApiKey as string, config.lsStoreId as string)
+    const ls = new LemonSqueezyProvider(lsApiKey as string, lsStoreId as string)
     const result = await ls.createCheckout({
       variantId: tier.lsVariantId,
       email: userEmail,
@@ -57,7 +64,7 @@ export default defineEventHandler(async (event) => {
     return { url: result.data.attributes.url }
   }
 
-  if (config.paddleApiKey) {
+  if (paddleApiKey) {
     if (!tier.paddleProductId) throw createError({ statusCode: 409, message: 'This tier has not been synced to Paddle' })
     const siteUrl = (config.public.siteUrl as string) || 'https://example.com'
     const checkoutUrl = new URL('/checkout', siteUrl)

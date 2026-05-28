@@ -59,7 +59,7 @@ const statusColors: Record<string, UColor> = {
 <template>
   <div class="max-w-5xl mx-auto space-y-6">
     <div>
-      <h1 class="text-2xl font-bold">Comments</h1>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Comments</h1>
       <p class="text-sm text-gray-500 mt-0.5">Review and moderate reader comments</p>
     </div>
 

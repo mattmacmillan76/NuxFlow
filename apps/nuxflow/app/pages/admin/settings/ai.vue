@@ -17,14 +17,37 @@ const form = reactive({
   ollamaModel: 'llama3.2',
 })
 
+const toast = useToast()
 const saving = ref(false)
 const testing = ref(false)
 const testResult = ref<'ok' | 'error' | null>(null)
+
+interface SiteData {
+  site: { id: string; name: string; domain: string; locale: string; timezone: string; status: string }
+  settings: Record<string, unknown>
+}
+
+const { data, refresh } = await useFetch<SiteData>('/api/v1/settings')
+
+watch(data, (d) => {
+  if (!d) return
+  const s = d.settings
+  form.provider = (s['ai.provider'] as string) ?? 'openai'
+  form.openaiApiKey = (s['ai.openai_api_key'] as string) ?? ''
+  form.anthropicApiKey = (s['ai.anthropic_api_key'] as string) ?? ''
+  form.geminiApiKey = (s['ai.gemini_api_key'] as string) ?? ''
+  form.ollamaBaseUrl = (s['ai.ollama_base_url'] as string) ?? 'http://localhost:11434'
+  form.ollamaModel = (s['ai.ollama_model'] as string) ?? 'llama3.2'
+}, { immediate: true })
 
 async function save() {
   saving.value = true
   try {
     await $fetch('/api/v1/settings', { method: 'PATCH', body: { ai: form } })
+    toast.add({ title: 'AI Settings saved successfully', color: 'green' })
+    await refresh()
+  } catch {
+    toast.add({ title: 'Failed to save AI Settings', color: 'red' })
   } finally {
     saving.value = false
   }
@@ -36,7 +59,7 @@ async function test() {
   try {
     await $fetch('/api/v1/ai/improve', {
       method: 'POST',
-      body: { text: 'Hello world', context: 'Test connection' },
+      body: { text: 'Hello world' },
     })
     testResult.value = 'ok'
   } catch {
@@ -114,7 +137,7 @@ async function test() {
       color="blue"
       variant="soft"
       title="Security note"
-      description="API keys are stored as server environment variables and never exposed to the client."
+      description="API keys are safely stored in your database using AES-GCM at-rest encryption and are never exposed to the client."
     />
   </div>
 </template>

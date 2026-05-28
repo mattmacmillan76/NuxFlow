@@ -4,14 +4,19 @@ import type { AiProvider, AiCompletionOptions } from './index'
 export class AnthropicProvider implements AiProvider {
   readonly name = 'anthropic'
   private client: Anthropic | null = null
+  private apiKey?: string
+
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey
+  }
 
   isConfigured(): boolean {
-    return !!(process.env.ANTHROPIC_API_KEY)
+    return !!(this.apiKey || process.env.ANTHROPIC_API_KEY)
   }
 
   private getClient(): Anthropic {
     if (!this.client) {
-      this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      this.client = new Anthropic({ apiKey: this.apiKey || process.env.ANTHROPIC_API_KEY })
     }
     return this.client
   }

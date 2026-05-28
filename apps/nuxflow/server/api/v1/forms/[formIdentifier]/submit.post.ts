@@ -16,11 +16,11 @@ export default defineEventHandler(async (event) => {
 
   const db = useDb(event)
   const siteId = event.context.siteId as string
-  const slug = getRouterParam(event, 'slug')!
+  const formIdentifier = getRouterParam(event, 'formIdentifier')!
   const body = await readValidatedBody(event, bodySchema.parse)
 
   const form = await db.query.forms.findFirst({
-    where: and(eq(forms.siteId, siteId), eq(forms.slug, slug)),
+    where: and(eq(forms.siteId, siteId), eq(forms.slug, formIdentifier)),
   })
   if (!form) throw createError({ statusCode: 404, message: 'Form not found' })
   if (form.status !== 'active') throw createError({ statusCode: 403, message: 'This form is not accepting submissions' })

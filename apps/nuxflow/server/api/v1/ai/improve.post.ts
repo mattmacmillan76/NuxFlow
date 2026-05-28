@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   await requireAuth(event)
   await rateLimit(event, { limit: 20, windowMs: 60_000, keyPrefix: 'ai' })
 
-  const ai = getAiProvider()
+  const ai = await getAiProvider(event)
   if (!ai) throw createError({ statusCode: 503, message: 'No AI provider configured' })
 
   const { text, instruction } = await readValidatedBody(event, bodySchema.parse)

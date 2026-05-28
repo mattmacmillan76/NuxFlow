@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { useDb } from '../../../utils/db'
-import { requireRole } from '../../../utils/permissions'
+import { useDb } from '../../../../utils/db'
+import { requireRole } from '../../../../utils/permissions'
 import { forms } from '@nuxflow/db/schema'
 import type { FormField, ConditionalLogic } from '@nuxflow/db/schema'
 import { and, eq, sql } from 'drizzle-orm'
@@ -18,11 +18,11 @@ export default defineEventHandler(async (event) => {
   await requireRole(event, 'editor')
   const db = useDb(event)
   const siteId = event.context.siteId as string
-  const id = getRouterParam(event, 'id')!
+  const formIdentifier = getRouterParam(event, 'formIdentifier')!
   const body = await readValidatedBody(event, bodySchema.parse)
 
   const form = await db.query.forms.findFirst({
-    where: and(eq(forms.id, id), eq(forms.siteId, siteId)),
+    where: and(eq(forms.id, formIdentifier), eq(forms.siteId, siteId)),
   })
   if (!form) throw createError({ statusCode: 404, message: 'Form not found' })
 
@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
       logic: body.logic as ConditionalLogic[] | undefined,
       updatedAt: sql`(datetime('now'))`,
     })
-    .where(and(eq(forms.id, id), eq(forms.siteId, siteId)))
+    .where(and(eq(forms.id, formIdentifier), eq(forms.siteId, siteId)))
 
-  return { id }
+  return { id: formIdentifier }
 })

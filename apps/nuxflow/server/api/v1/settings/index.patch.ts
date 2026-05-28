@@ -1,9 +1,9 @@
 import { z } from 'zod'
 import { useDb } from '../../../utils/db'
 import { requireRole } from '../../../utils/permissions'
-import { sites, siteSettings } from '@nuxflow/db/schema'
-import { and, eq, sql } from 'drizzle-orm'
-import { ulid } from 'ulid'
+import { sites } from '@nuxflow/db/schema'
+import { eq, sql } from 'drizzle-orm'
+import { saveSetting } from '../../../utils/settings'
 
 const bodySchema = z.object({
   // Site columns
@@ -14,6 +14,15 @@ const bodySchema = z.object({
   status: z.enum(['active', 'maintenance']).optional(),
   // Site settings (key-value store)
   settings: z.record(z.unknown()).optional(),
+  // AI settings compatibility
+  ai: z.object({
+    provider: z.string().optional(),
+    openaiApiKey: z.string().optional(),
+    anthropicApiKey: z.string().optional(),
+    geminiApiKey: z.string().optional(),
+    ollamaBaseUrl: z.string().optional(),
+    ollamaModel: z.string().optional(),
+  }).optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -38,17 +47,18 @@ export default defineEventHandler(async (event) => {
 
   if (body.settings) {
     for (const [key, value] of Object.entries(body.settings)) {
-      const existing = await db.query.siteSettings.findFirst({
-        where: and(eq(siteSettings.siteId, siteId), eq(siteSettings.key, key)),
-      })
-      if (existing) {
-        await db.update(siteSettings)
-          .set({ value, updatedAt: sql`(datetime('now'))` })
-          .where(and(eq(siteSettings.siteId, siteId), eq(siteSettings.key, key)))
-      } else {
-        await db.insert(siteSettings).values({ id: ulid(), siteId, key, value })
-      }
+      await saveSetting(event, key, value)
     }
+  }
+
+  if (body.ai) {
+    const ai = body.ai
+    if (ai.provider !== undefined) await saveSetting(event, 'ai.provider', ai.provider)
+    if (ai.openaiApiKey !== undefined) await saveSetting(event, 'ai.openai_api_key', ai.openaiApiKey)
+    if (ai.anthropicApiKey !== undefined) await saveSetting(event, 'ai.anthropic_api_key', ai.anthropicApiKey)
+    if (ai.geminiApiKey !== undefined) await saveSetting(event, 'ai.gemini_api_key', ai.geminiApiKey)
+    if (ai.ollamaBaseUrl !== undefined) await saveSetting(event, 'ai.ollama_base_url', ai.ollamaBaseUrl)
+    if (ai.ollamaModel !== undefined) await saveSetting(event, 'ai.ollama_model', ai.ollamaModel)
   }
 
   return { success: true }

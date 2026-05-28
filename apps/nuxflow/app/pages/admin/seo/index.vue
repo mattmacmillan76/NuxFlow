@@ -163,7 +163,7 @@ const columns = [
         <template v-if="active === 'Global defaults'">
           <UCard>
             <template #header>
-              <p class="text-sm font-semibold">Global SEO defaults</p>
+              <p class="text-sm font-semibold text-gray-900 dark:text-white">Global SEO defaults</p>
               <p class="text-xs text-gray-400 mt-0.5">Applied to pages that don't have their own SEO fields set</p>
             </template>
             <div class="space-y-4">
@@ -211,7 +211,7 @@ const columns = [
           <!-- Add form -->
           <UCard>
             <template #header>
-              <p class="text-sm font-semibold">Add redirect</p>
+              <p class="text-sm font-semibold text-gray-900 dark:text-white">Add redirect</p>
               <p class="text-xs text-gray-400 mt-0.5">Redirects are checked before page content is served</p>
             </template>
             <div class="space-y-3">
@@ -238,7 +238,7 @@ const columns = [
           <!-- Redirect list -->
           <UCard>
             <template #header>
-              <p class="text-sm font-semibold">Active redirects</p>
+              <p class="text-sm font-semibold text-gray-900 dark:text-white">Active redirects</p>
               <p class="text-xs text-gray-400 mt-0.5">{{ redirects.length }} redirect{{ redirects.length === 1 ? '' : 's' }}</p>
             </template>
 

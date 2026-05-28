@@ -127,7 +127,7 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
 <template>
   <div class="max-w-2xl mx-auto space-y-6">
     <div>
-      <h1 class="text-2xl font-bold">Import & Backup</h1>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Import & Backup</h1>
       <p class="text-sm text-gray-500 mt-0.5">Back up your site data, restore from a backup, or import from WordPress</p>
     </div>
 
@@ -155,7 +155,7 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
             <UIcon name="i-lucide-database-backup" class="w-5 h-5 text-green-600 dark:text-green-400" />
           </div>
           <div>
-            <p class="font-semibold text-sm">Download backup</p>
+            <p class="font-semibold text-sm text-gray-900 dark:text-white">Download backup</p>
             <p class="text-xs text-gray-400">Export your full site as a portable JSON file</p>
           </div>
         </div>
@@ -166,12 +166,19 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
           icon="i-lucide-info"
           color="blue"
           variant="soft"
-          title="What's included"
-          description="A self-contained .zip file with all site data and media files. Restoring it on any NuxFlow site will re-upload your images to that site's configured media provider. Limit: 100 MB of media."
-        />
+        >
+          <template #title>
+            <span class="text-blue-900 dark:text-blue-200 font-semibold">What's included</span>
+          </template>
+          <template #description>
+            <span class="text-gray-800 dark:text-gray-200">
+              A self-contained .zip file with all site data and media files. Restoring it on any NuxFlow site will re-upload your images to that site's configured media provider. Limit: 100 MB of media.
+            </span>
+          </template>
+        </UAlert>
 
         <div class="grid grid-cols-2 gap-3 text-sm">
-          <div v-for="item in ['Content & pages', 'Categories & tags', 'Menus', 'Forms', 'Site settings', 'Content types', 'Media files']" :key="item" class="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+          <div v-for="item in ['Content & pages', 'Categories & tags', 'Menus', 'Forms', 'Site settings', 'Content types', 'Media files']" :key="item" class="flex items-center gap-2 text-gray-800 dark:text-gray-200 font-medium">
             <UIcon name="i-lucide-check" class="w-4 h-4 text-green-500 shrink-0" />
             {{ item }}
           </div>
@@ -195,7 +202,7 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
             <UIcon name="i-lucide-history" class="w-5 h-5 text-orange-600 dark:text-orange-400" />
           </div>
           <div>
-            <p class="font-semibold text-sm">Restore from backup</p>
+            <p class="font-semibold text-sm text-gray-900 dark:text-white">Restore from backup</p>
             <p class="text-xs text-gray-400">Import a .json backup file exported from NuxFlow</p>
           </div>
         </div>
@@ -222,7 +229,7 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
             <label
               v-for="opt in restoreWhatOptions"
               :key="opt.value"
-              class="flex items-center gap-2 text-sm cursor-pointer"
+              class="flex items-center gap-2 text-sm cursor-pointer text-gray-700 dark:text-gray-300"
             >
               <input
                 v-model="restoreWhat"
@@ -237,11 +244,11 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
 
         <UFormField label="Conflict handling" hint="What to do when a slug already exists">
           <div class="flex gap-4">
-            <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <label class="flex items-center gap-2 text-sm cursor-pointer text-gray-700 dark:text-gray-300">
               <input v-model="restoreConflict" type="radio" value="skip" class="text-primary-500">
               Skip (keep existing)
             </label>
-            <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <label class="flex items-center gap-2 text-sm cursor-pointer text-gray-700 dark:text-gray-300">
               <input v-model="restoreConflict" type="radio" value="overwrite" class="text-primary-500">
               Overwrite
             </label>
@@ -294,7 +301,7 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
             <UIcon name="i-lucide-arrow-right-left" class="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <p class="font-semibold text-sm">WordPress</p>
+            <p class="font-semibold text-sm text-gray-900 dark:text-white">WordPress</p>
             <p class="text-xs text-gray-400">Import posts, pages, categories, and tags from a WordPress WXR export</p>
           </div>
         </div>
@@ -305,9 +312,16 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
           icon="i-lucide-info"
           color="blue"
           variant="soft"
-          title="What gets imported"
-          description="Posts and pages (with content), categories, tags, and publish status. Media files are not re-uploaded — image references will still point to your old WordPress URL."
-        />
+        >
+          <template #title>
+            <span class="text-blue-900 dark:text-blue-200 font-semibold">What gets imported</span>
+          </template>
+          <template #description>
+            <span class="text-gray-800 dark:text-gray-200">
+              Posts and pages (with content), categories, tags, and publish status. Media files are not re-uploaded — image references will still point to your old WordPress URL.
+            </span>
+          </template>
+        </UAlert>
 
         <UFormField label="WordPress export file (.xml)">
           <div

@@ -4,14 +4,19 @@ import type { AiProvider, AiCompletionOptions } from './index'
 export class OpenAiProvider implements AiProvider {
   readonly name = 'openai'
   private client: OpenAI | null = null
+  private apiKey?: string
+
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey
+  }
 
   isConfigured(): boolean {
-    return !!(process.env.OPENAI_API_KEY)
+    return !!(this.apiKey || process.env.OPENAI_API_KEY)
   }
 
   private getClient(): OpenAI {
     if (!this.client) {
-      this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+      this.client = new OpenAI({ apiKey: this.apiKey || process.env.OPENAI_API_KEY })
     }
     return this.client
   }

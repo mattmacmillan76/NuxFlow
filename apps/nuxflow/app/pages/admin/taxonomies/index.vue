@@ -101,7 +101,7 @@ async function deleteTerm(termId: string) {
   <div class="max-w-6xl mx-auto space-y-6">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold">Taxonomies</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Taxonomies</h1>
         <p class="text-sm text-gray-500 mt-0.5">Manage categories, tags, and custom groupings for your content</p>
       </div>
       <UButton icon="i-lucide-plus" @click="showCreate = true">New taxonomy</UButton>
@@ -123,7 +123,7 @@ async function deleteTerm(termId: string) {
                 <UIcon :name="tax.isHierarchical ? 'i-lucide-folder-tree' : 'i-lucide-tag'" class="w-4 h-4 text-primary-600 dark:text-primary-400" />
               </div>
               <div>
-                <p class="font-medium text-sm">{{ tax.name }}</p>
+                <p class="font-medium text-sm text-gray-900 dark:text-white">{{ tax.name }}</p>
                 <p class="text-xs text-gray-400 font-mono">{{ tax.slug }}</p>
               </div>
             </div>
@@ -150,7 +150,7 @@ async function deleteTerm(termId: string) {
         <UCard>
           <template #header>
             <div class="flex items-center justify-between">
-              <p class="font-semibold text-sm">{{ activeTaxonomy.name }} terms</p>
+              <p class="font-semibold text-sm text-gray-900 dark:text-white">{{ activeTaxonomy.name }} terms</p>
               <UBadge :label="`${terms.length} terms`" variant="soft" size="xs" />
             </div>
           </template>
@@ -166,8 +166,8 @@ async function deleteTerm(termId: string) {
                 :key="term.id"
                 class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 group"
               >
-                <div>
-                  <span class="text-sm font-medium">{{ term.name }}</span>
+                 <div>
+                  <span class="text-sm font-medium text-gray-900 dark:text-white">{{ term.name }}</span>
                   <span class="text-xs text-gray-400 font-mono ml-2">{{ term.slug }}</span>
                   <p v-if="term.description" class="text-xs text-gray-400 mt-0.5">{{ term.description }}</p>
                 </div>

@@ -68,11 +68,13 @@ export async function decryptText(ciphertextWithIv: string, secret: string): Pro
     const ciphertext = fromBase64Url(cipherB64)
 
     const key = await getEncryptionKey(secret)
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
+      { name: 'AES-GCM', iv: iv as any },
       key,
-      ciphertext
+      ciphertext as any
     )
+    /* eslint-enable @typescript-eslint/no-explicit-any */
 
     return DECODER.decode(decrypted)
   } catch {

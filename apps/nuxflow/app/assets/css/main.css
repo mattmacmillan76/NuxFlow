@@ -100,14 +100,14 @@ body {
    Sidebar nav active state
    ─────────────────────────────────────────── */
 .nav-active {
-  background: rgba(0, 220, 130, 0.14);
-  color: #065f46;
+  background: color-mix(in srgb, var(--nuxflow-primary, #00dc82) 12%, transparent);
+  color: color-mix(in srgb, var(--nuxflow-primary, #00dc82) 55%, #000000);
   font-weight: 600;
 }
 
 .dark .nav-active {
-  background: rgba(0, 220, 130, 0.14);
-  color: #00DC82;
+  background: color-mix(in srgb, var(--nuxflow-primary, #00dc82) 14%, transparent);
+  color: var(--nuxflow-primary, #00dc82);
 }
 
 /* ───────────────────────────────────────────

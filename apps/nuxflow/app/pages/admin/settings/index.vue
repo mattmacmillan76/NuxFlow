@@ -275,6 +275,20 @@ async function deleteSite() {
 
         <!-- Appearance -->
         <template v-if="active === 'Appearance'">
+          <UAlert
+            icon="i-lucide-palette"
+            color="blue"
+            variant="soft"
+            title="Colour scheme, accent colour &amp; body font"
+            description="These appearance settings live under Themes → Appearance alongside your active theme controls."
+          >
+            <template #description>
+              These appearance settings live under
+              <NuxtLink to="/admin/themes" class="underline font-medium">Themes → Appearance</NuxtLink>
+              alongside your active theme controls.
+            </template>
+          </UAlert>
+
           <UCard>
             <template #header><p class="text-sm font-semibold text-gray-900 dark:text-white">Favicon</p></template>
             <div class="space-y-4">

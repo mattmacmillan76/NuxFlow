@@ -4,6 +4,7 @@ import { requireRole } from '../../../utils/permissions'
 import { sites } from '@nuxflow/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { saveSetting } from '../../../utils/settings'
+import { clearAppearanceCache } from '../../../plugins/site-settings-resolver'
 
 const bodySchema = z.object({
   // Site columns
@@ -60,6 +61,12 @@ export default defineEventHandler(async (event) => {
     if (ai.ollamaBaseUrl !== undefined) await saveSetting(event, 'ai.ollama_base_url', ai.ollamaBaseUrl)
     if (ai.ollamaModel !== undefined) await saveSetting(event, 'ai.ollama_model', ai.ollamaModel)
   }
+
+  // If any appearance settings changed, bust the per-isolate cache so the next
+  // page render picks up the new values immediately.
+  const appearanceKeys = new Set(['theme.dark_mode', 'theme.primary_color', 'theme.font_sans'])
+  const touchedAppearance = body.settings && Object.keys(body.settings).some(k => appearanceKeys.has(k))
+  if (touchedAppearance) clearAppearanceCache(siteId)
 
   return { success: true }
 })

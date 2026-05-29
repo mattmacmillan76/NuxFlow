@@ -433,6 +433,26 @@ const swatches = [
     <div class="space-y-3">
       <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Appearance</h2>
 
+      <!-- How appearance settings work -->
+      <UCard>
+        <div class="flex gap-3">
+          <div class="shrink-0 w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center">
+            <UIcon name="i-lucide-info" class="w-4 h-4 text-primary-500" />
+          </div>
+          <div class="space-y-1 text-sm">
+            <p class="font-medium text-gray-900 dark:text-white">How these settings affect your site</p>
+            <p class="text-gray-500 dark:text-gray-400">
+              These three settings are injected into every public page as CSS — they are separate from your theme file and take effect on the next page load.
+            </p>
+            <ul class="mt-2 space-y-1 text-gray-500 dark:text-gray-400">
+              <li><span class="font-medium text-gray-700 dark:text-gray-300">Colour scheme</span> — forces dark or light mode on the public site; <em>auto</em> follows each visitor's system preference.</li>
+              <li><span class="font-medium text-gray-700 dark:text-gray-300">Accent colour</span> — injected as <code class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">--nuxflow-primary</code>. Use <code class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">var(--nuxflow-primary)</code> in your theme CSS to reference it.</li>
+              <li><span class="font-medium text-gray-700 dark:text-gray-300">Body font</span> — loads the Google Font and injects it as <code class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">--nuxflow-font</code>, applied automatically to the page body.</li>
+            </ul>
+          </div>
+        </div>
+      </UCard>
+
       <UCard>
         <template #header>
           <p class="text-sm font-semibold">Global appearance</p>
@@ -444,7 +464,7 @@ const swatches = [
             <USelect v-model="appearance.darkMode" :items="darkModeOptions" class="w-full max-w-xs" />
           </UFormField>
 
-          <UFormField label="Accent colour" hint="Used for buttons, links, and highlights">
+          <UFormField label="Accent colour" hint="Injected as --nuxflow-primary on every public page. Reference it in your theme CSS with var(--nuxflow-primary).">
             <div class="flex items-center gap-3">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <button
@@ -611,6 +631,58 @@ const swatches = [
           <p class="text-sm text-gray-500 dark:text-gray-400">
             Changes take effect on the next page load. The previous CSS is replaced entirely.
           </p>
+
+          <!-- CSS quick-reference (collapsible) -->
+          <details class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs">
+            <summary class="flex items-center gap-1.5 px-3 py-2 bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-400 font-medium cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+              <UIcon name="i-lucide-code-2" class="w-3.5 h-3.5 shrink-0" />
+              CSS reference — available tokens &amp; selectors
+            </summary>
+            <div class="p-3 space-y-4 bg-white dark:bg-gray-900">
+
+              <!-- Injected variables -->
+              <div>
+                <p class="font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Injected from Appearance settings</p>
+                <div class="font-mono space-y-0.5 text-gray-600 dark:text-gray-400">
+                  <p><span class="text-primary-600 dark:text-primary-400">--nuxflow-primary</span>  <span class="text-gray-400">/* accent colour */</span></p>
+                  <p><span class="text-primary-600 dark:text-primary-400">--nuxflow-font</span>     <span class="text-gray-400">/* body font stack */</span></p>
+                </div>
+              </div>
+
+              <!-- Admin tokens -->
+              <div>
+                <p class="font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Admin dashboard tokens</p>
+                <div class="font-mono space-y-0.5 text-gray-600 dark:text-gray-400">
+                  <p>--glass-bg / --glass-border         <span class="text-gray-400">/* header bar */</span></p>
+                  <p>--glass-xl-bg / --glass-xl-border   <span class="text-gray-400">/* sidebar */</span></p>
+                  <p>--shadow-glass / --shadow-glass-hover</p>
+                  <p>.mesh-bg                            <span class="text-gray-400">/* page background */</span></p>
+                  <p>.nav-active                         <span class="text-gray-400">/* active nav item */</span></p>
+                </div>
+              </div>
+
+              <!-- Canvas block selectors -->
+              <div>
+                <p class="font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Canvas block selectors (public pages)</p>
+                <div class="font-mono space-y-0.5 text-gray-600 dark:text-gray-400">
+                  <p>.canvas-hero         <span class="text-gray-400">/* hero / banner */</span></p>
+                  <p>.canvas-features     <span class="text-gray-400">/* feature grid */</span></p>
+                  <p>.canvas-image        <span class="text-gray-400">/* image block (figure inside) */</span></p>
+                  <p>.canvas-text         <span class="text-gray-400">/* rich text block */</span></p>
+                  <p>.canvas-columns      <span class="text-gray-400">/* multi-column layout */</span></p>
+                  <p>.canvas-testimonial  <span class="text-gray-400">/* testimonial card */</span></p>
+                  <p>.canvas-cta          <span class="text-gray-400">/* call-to-action banner */</span></p>
+                  <p>.canvas-spacer       <span class="text-gray-400">/* vertical spacer */</span></p>
+                  <p>.nux-blocks          <span class="text-gray-400">/* outer canvas wrapper */</span></p>
+                  <p>.nux-content         <span class="text-gray-400">/* TipTap prose (non-Canvas) */</span></p>
+                </div>
+              </div>
+
+              <p class="text-gray-400 pt-1 border-t border-gray-100 dark:border-gray-800">
+                Full reference with examples: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">themes/default/assets/css/theme.css</code>
+              </p>
+            </div>
+          </details>
 
           <UFormField label="CSS" required>
             <UTextarea

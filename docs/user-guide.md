@@ -84,9 +84,20 @@ You can change the visual appearance of your site from **Admin → Themes**.
 
 - **Activate**: Switch to any installed theme immediately.
 - **Preview**: Open a preview link before committing to a theme.
-- **Appearance**: Adjust the accent colour, body font, and dark mode preference without changing themes.
 
-The built-in Default theme is always available as a fallback. Additional themes must be added to the codebase before deploying — see [Adding themes](#adding-themes-and-plugins) below.
+The built-in Default theme is always available as a fallback. Additional themes can be installed as a zip package from the **Install theme** button or added to the codebase and deployed — see [Adding themes](#adding-themes-and-plugins) below.
+
+### Appearance settings
+
+The **Appearance** card at the bottom of the Themes page controls three global settings that apply to every public-facing page on your site. They take effect on the next page load.
+
+| Setting | What it does |
+|---|---|
+| **Colour scheme** | `dark` forces dark mode on all public pages; `light` forces light mode; `auto` follows each visitor's system preference |
+| **Accent colour** | Injected into every page as the CSS variable `--nuxflow-primary`. Your theme CSS can reference `var(--nuxflow-primary)` to pick up this colour automatically. Also controls the active item highlight in the admin sidebar |
+| **Body font** | Injects the chosen Google Font and applies it to the page body via `--nuxflow-font`. Requests are loaded from `fonts.googleapis.com` |
+
+These settings are separate from the active theme CSS file — you can set an accent colour without uploading or editing any CSS. If your theme CSS also hardcodes a colour, the theme's value takes precedence for those specific selectors.
 
 ---
 

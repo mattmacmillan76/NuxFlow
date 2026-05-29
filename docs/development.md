@@ -290,48 +290,140 @@ For a complete guide covering plugin structure, Canvas block registration, signi
 
 ## Theme Development
 
-A NuxFlow theme is a CSS file that overrides design tokens. Themes can optionally include a `theme.json` metadata file and a `demo.json` file containing starter content.
+A NuxFlow theme is a CSS file that overrides design tokens and adds selectors targeting public-facing pages. Themes can optionally include a `theme.json` metadata file and a `demo.json` file containing starter content.
 
-The default theme lives in `themes/default/`. Use it as a reference for the available CSS custom properties.
+The authoritative reference for every available token and selector is `themes/default/assets/css/theme.css`. It is heavily commented and organised into sections — use it as the starting point for any new theme.
 
-The `examples/hello-theme/` directory contains a minimal theme with annotations explaining each section. It is the recommended starting point for a new theme.
+The `examples/hello-theme/` directory is a working example theme with a warm sunset palette. It is the recommended starting point.
 
 ### Testing a theme locally
 
 Build your theme into a zip package and upload it through the admin:
 
 1. Create a zip containing `theme.css` and optionally `theme.json` and `demo.json`
-2. Go to **Admin → Themes → Upload theme**
-3. Activate the theme and inspect the result
+2. Go to **Admin → Themes → Install theme**
+3. Activate the theme and inspect the result on the public site
 
 To include starter content images in `demo.json`, place them in an `images/` folder inside the zip. NuxFlow uploads them to your configured media provider and rewrites the references automatically.
 
-### Advanced Guidelines for Theme Bundlers
+### How the CSS pipeline works
 
-#### 1. Canvas Full-Width Layout Paradigm
-NuxFlow page templates served via the **Canvas page builder** (i.e. pages containing `"type": "canvas"` inside their page JSON) render **full-width** without an outer restrictive container or automatic heading output. This is intentional to allow visual page builders to create stunning full-bleed heroes, multi-color alternating card grids, and interactive wide galleries.
+Theme CSS is stored in Cloudflare KV and injected as an inline `<style data-nuxflow-theme>` block into the `<head>` of every SSR page response — no redeploy needed, and no flash of the default theme on first paint.
 
-Because of this, theme creators should specify container constraints inside their `theme.css` to prevent standard layout blocks from expanding infinitely on large desktop displays (1080p, 1440p, or 4K viewports).
+Three additional CSS custom properties are injected separately from **Admin → Themes → Appearance** settings:
 
-#### 2. Constraining and Styling Block Components
-If an image block (`canvas-image`) or prose column block needs viewport constraints, target their unique DOM elements inside your `theme.css`.
+| CSS variable | Source |
+|---|---|
+| `--nuxflow-primary` | Accent colour picker |
+| `--nuxflow-font` | Body font selector |
+| (dark class on `<html>`) | Colour scheme setting |
 
-For instance, to enforce a premium mockup container look with automated centering and viewport limits for images, include the following rule in your `theme.css`:
+Your theme CSS can reference `var(--nuxflow-primary)` to pick up the user-chosen accent colour. This means a theme author can leave the exact colour open-ended and let site owners choose it without editing CSS.
+
+### Available CSS tokens
+
+#### Appearance settings bridge
+
 ```css
-/* Constrain canvas-image blocks to an elegant dashboard max-width */
+/* Injected per-request from Admin → Themes → Appearance */
+var(--nuxflow-primary)   /* accent colour, e.g. #00dc82 */
+var(--nuxflow-font)      /* font-family stack, e.g. 'Inter', system-ui */
+```
+
+#### Legacy colour tokens
+
+```css
+:root {
+  --color-primary:       #00dc82;
+  --color-primary-hover: #00c274;
+}
+```
+
+#### Admin dashboard glass surfaces
+
+```css
+:root {
+  --glass-bg:           rgba(255, 255, 255, 0.88);  /* header bar    */
+  --glass-border:       rgba(0, 0, 0, 0.09);
+  --glass-xl-bg:        rgba(255, 255, 255, 0.94);  /* sidebar       */
+  --glass-xl-border:    rgba(0, 0, 0, 0.08);
+  --shadow-glass:       …;
+  --shadow-glass-hover: …;
+}
+
+.dark {
+  --glass-bg:        rgba(8, 16, 30, 0.40);
+  --glass-xl-bg:     rgba(8, 16, 30, 0.60);
+  /* …borders and shadows */
+}
+```
+
+#### Admin page background
+
+```css
+.mesh-bg { background-color: #ffffff; }
+
+.dark .mesh-bg {
+  background-color: #040e1a;
+  background-image: radial-gradient(…green…), radial-gradient(…blue…), radial-gradient(…purple…);
+}
+```
+
+#### Admin sidebar active item
+
+```css
+.nav-active       { background: …; color: …; }  /* light mode */
+.dark .nav-active { background: …; color: …; }  /* dark mode  */
+```
+
+### Canvas block selectors
+
+Pages using the Canvas page builder render **full-width** with no outer container. Every block has a semantic class on its root element:
+
+| Selector | Block |
+|---|---|
+| `.canvas-hero` | Hero / banner section |
+| `.canvas-features` | Feature grid |
+| `.canvas-image` | Image block — `<figure>` inside holds the image |
+| `.canvas-text` | Rich text / prose block |
+| `.canvas-columns` | Multi-column layout |
+| `.canvas-testimonial` | Testimonial / quote card |
+| `.canvas-cta` | Call-to-action banner |
+| `.canvas-spacer` | Vertical spacer / divider |
+| `.nux-blocks` | Outer wrapper for the entire canvas page |
+
+Because Canvas pages are full-width, add `max-width` constraints inside your selectors to prevent elements from stretching on large viewports:
+
+```css
+/* Keep hero text readable on ultra-wide screens */
+.canvas-hero .max-w-5xl { max-width: 1024px; }
+
+/* Constrain images with a glow border */
+.canvas-image figure,
 .nux-blocks figure {
-  max-width: 900px !important;
-  width: 100% !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.5);
   overflow: hidden;
 }
 ```
 
-#### 3. Cross-Platform ZIP Packaging
-Windows zip utilities (including PowerShell's `Compress-Archive` and Explorer's Send to Compressed Folder) compress directories using **backslashes** in file paths (e.g. `images\my-graphic.png`). 
+### Content typography selector
 
-NuxFlow automatically normalizes these backslashes into standard forward-slashes (`/`) during theme uploads and backup restores under the hood on Cloudflare. However, to keep your zip packages clean and standardized across Mac, Linux, and Windows, it is highly recommended to package theme files with POSIX-standard paths whenever possible.
+`.nux-content` wraps all TipTap-rendered rich text (standard block editor — blog posts, pages that are not Canvas). Style it to match your theme:
+
+```css
+.nux-content a       { color: var(--nuxflow-primary, #00a86b); }
+.dark .nux-content a { color: var(--nuxflow-primary, #00dc82); }
+
+.nux-content blockquote { border-left-color: var(--nuxflow-primary, #00dc82); }
+```
+
+### ZIP packaging
+
+A theme zip must contain `theme.css` at the root. Optional files: `theme.json` (name, version metadata) and `demo.json` (starter content). Images referenced in `demo.json` go in an `images/` subfolder.
+
+Windows zip utilities write backslash paths (`images\photo.png`). NuxFlow normalises these automatically on upload, but using POSIX paths (`images/photo.png`) is safer across all platforms.

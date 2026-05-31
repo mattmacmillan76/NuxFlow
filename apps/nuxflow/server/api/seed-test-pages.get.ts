@@ -1,5 +1,5 @@
 import { useDb } from '../utils/db'
-import { contentItems, contentTypes, sites, users } from '@nuxflow/db/schema'
+import { contentItems, contentTypes } from '@nuxflow/db/schema'
 import { eq } from 'drizzle-orm'
 import { ulid } from 'ulid'
 

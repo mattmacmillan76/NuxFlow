@@ -1,12 +1,20 @@
 <script setup lang="ts">
 const emit = defineEmits<{ select: [{ url: string; altText?: string }] }>()
 
-const { data } = await useFetch<any>('/api/v1/media')
-const files = computed<any[]>(() => data.value?.files ?? [])
+interface MediaFile {
+  id: string
+  url: string
+  originalName: string
+  altText?: string | null
+  mimeType: string
+}
+
+const { data } = await useFetch<{ files?: MediaFile[] }>('/api/v1/media')
+const files = computed<MediaFile[]>(() => data.value?.files ?? [])
 
 const search = ref('')
 const filtered = computed(() =>
-  files.value.filter((f: any) => f.originalName.toLowerCase().includes(search.value.toLowerCase())),
+  files.value.filter((f: MediaFile) => f.originalName.toLowerCase().includes(search.value.toLowerCase())),
 )
 
 function select(file: { url: string; altText?: string | null }) {

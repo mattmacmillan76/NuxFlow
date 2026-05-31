@@ -1,5 +1,14 @@
 <script setup lang="ts">
-const { data: page } = await useFetch<any>('/api/public/pages/home', {
+interface PublicPage {
+  id: string
+  title: string
+  seoTitle?: string | null
+  seoDescription?: string | null
+  content: unknown
+  hasComments?: boolean | null
+}
+
+const { data: page } = await useFetch<PublicPage>('/api/public/pages/home', {
   headers: useRequestHeaders(['host']),
 })
 

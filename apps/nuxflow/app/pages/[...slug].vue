@@ -2,7 +2,16 @@
 const route = useRoute()
 const slug = computed(() => (route.params.slug as string[]).join('/'))
 
-const { data: page, error } = await useFetch<any>(() => `/api/public/pages/${slug.value}`, {
+interface PublicPage {
+  id: string
+  title: string
+  seoTitle?: string | null
+  seoDescription?: string | null
+  content: unknown
+  hasComments?: boolean | null
+}
+
+const { data: page, error } = await useFetch<PublicPage>(() => `/api/public/pages/${slug.value}`, {
   headers: useRequestHeaders(['host']),
 })
 

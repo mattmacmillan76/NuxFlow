@@ -4,7 +4,23 @@ definePageMeta({ layout: 'admin', middleware: ['auth'] })
 const route = useRoute()
 const id = route.params.id as string
 
-const { data } = await useFetch<any>(`/api/v1/forms/${id}/submissions`)
+interface FormDetails {
+  id: string
+  name: string
+}
+
+interface Submission {
+  id: string
+  createdAt: string
+  data: Record<string, unknown>
+}
+
+interface FormSubmissionsPayload {
+  form?: FormDetails
+  submissions?: Submission[]
+}
+
+const { data } = await useFetch<FormSubmissionsPayload>(`/api/v1/forms/${id}/submissions`)
 const form = computed(() => data.value?.form)
 const submissions = computed(() => data.value?.submissions ?? [])
 

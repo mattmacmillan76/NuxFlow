@@ -2,7 +2,13 @@
 const props = defineProps<{ contentId: string }>()
 const emit = defineEmits<{ restored: [] }>()
 
-const { data } = await useFetch<any>(() => `/api/v1/content/${props.contentId}/revisions`)
+interface Revision {
+  id: string
+  title: string
+  createdAt: string
+}
+
+const { data } = await useFetch<{ revisions?: Revision[] }>(() => `/api/v1/content/${props.contentId}/revisions`)
 const revisions = computed(() => data.value?.revisions ?? [])
 const restoring = ref<string | null>(null)
 

@@ -12,7 +12,12 @@ type Folder = { id: string; name: string; fileCount: number }
 // ── Data ──────────────────────────────────────────────────────────────────────
 const selectedFolderId = ref<string | null | undefined>(undefined) // undefined = all
 
-const { data: folderData, refresh: refreshFolders } = await useFetch<any>('/api/v1/media/folders')
+interface FolderPayload {
+  folders?: Folder[]
+  unfolderedCount?: number
+}
+
+const { data: folderData, refresh: refreshFolders } = await useFetch<FolderPayload>('/api/v1/media/folders')
 const folders = computed<Folder[]>(() => folderData.value?.folders ?? [])
 const unfolderedCount = computed(() => folderData.value?.unfolderedCount ?? 0)
 

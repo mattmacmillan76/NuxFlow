@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const keyHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
 
   const apiKey = await db.query.apiKeys.findFirst({
-    where: and(eq(apiKeys.keyHash, keyHash), eq(apiKeys.isActive, true)),
+    where: eq(apiKeys.keyHash, keyHash),
   })
 
   if (!apiKey) return

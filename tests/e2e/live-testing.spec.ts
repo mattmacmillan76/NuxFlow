@@ -629,13 +629,20 @@ test.describe('NuxFlow Production Live E2E Testing', () => {
     // Click delete trash icon inside card
     await menuCard.locator('button').click()
     
+    // Wait for the modal to open
+    await page.waitForTimeout(1000)
+
+    // Type 'DELETE' in confirmation input to unlock the button
+    await page.locator('input[placeholder="DELETE"]').fill('DELETE')
+    await page.waitForTimeout(500)
+    
     // Confirm modal delete
     const deleteMenuPromise = page.waitForResponse(response => 
       response.url().includes(`/api/v1/menus/`) && 
       response.request().method() === 'DELETE' && 
       response.status() === 200
     )
-    await page.locator('button:has-text("Delete")').click()
+    await page.locator('button:has-text("Delete permanently")').click()
     await deleteMenuPromise
     
     // Verify card is removed

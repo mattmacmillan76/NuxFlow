@@ -15,11 +15,32 @@ const loading = ref(true)
 const registering = ref(false)
 const passkeyName = ref('')
 
+function formatDate(dateStr?: string) {
+  if (!dateStr) return 'N/A'
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return 'N/A'
+  try {
+    return date.toLocaleDateString(undefined, { dateStyle: 'medium' })
+  } catch {
+    return date.toLocaleDateString()
+  }
+}
+
 async function fetchPasskeys() {
   loading.value = true
   try {
+    if (!client?.passkey) {
+      console.warn('Better Auth Passkey client is not initialized.')
+      passkeys.value = []
+      return
+    }
     const res = await client.passkey.listUserPasskeys()
-    passkeys.value = (res || []) as Passkey[]
+    if (res?.error) {
+      console.error('Failed to load passkeys:', res.error)
+      passkeys.value = []
+      return
+    }
+    passkeys.value = (res?.data || []) as Passkey[]
   } catch (err) {
     console.error('Failed to load passkeys:', err)
   } finally {
@@ -30,6 +51,11 @@ async function fetchPasskeys() {
 async function registerPasskey() {
   if (!passkeyName.value.trim()) {
     toast.add({ title: 'Please provide a name for this passkey', color: 'red' })
+    return
+  }
+
+  if (!client?.passkey) {
+    toast.add({ title: 'Passkey authentication is not configured.', color: 'red' })
     return
   }
 
@@ -56,6 +82,11 @@ async function registerPasskey() {
 }
 
 async function deletePasskey(id: string) {
+  if (!client?.passkey) {
+    toast.add({ title: 'Passkey authentication is not configured.', color: 'red' })
+    return
+  }
+
   try {
     const result = await client.passkey.deletePasskey({ id })
     if (result?.error) {
@@ -119,7 +150,7 @@ onMounted(() => {
               <div>
                 <p class="text-sm font-medium text-gray-900 dark:text-white">{{ pk.name || 'Unnamed Passkey' }}</p>
                 <div class="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                  <span>Created {{ new Date(pk.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) }}</span>
+                  <span>Created {{ formatDate(pk.createdAt) }}</span>
                   <span>•</span>
                   <UBadge size="sm" variant="soft" :color="pk.deviceType === 'platform' ? 'blue' : 'orange'">
                     {{ pk.deviceType === 'platform' ? 'Device Biometrics' : 'Security Key' }}

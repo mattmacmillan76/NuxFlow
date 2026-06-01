@@ -55,7 +55,14 @@ async function applyMigrations(event: H3Event) {
         await db.run(sql.raw(stmt))
       } catch (err) {
         // Skip statements that were already applied (partial retry after prior failure).
-        if (String(err).toLowerCase().includes('already exists')) continue
+        const errMsg = String(err).toLowerCase()
+        const causeMsg = err instanceof Error && err.cause ? String(err.cause).toLowerCase() : ''
+        if (
+          errMsg.includes('already exists') || 
+          errMsg.includes('duplicate column') ||
+          causeMsg.includes('already exists') ||
+          causeMsg.includes('duplicate column')
+        ) continue
         throw err
       }
     }

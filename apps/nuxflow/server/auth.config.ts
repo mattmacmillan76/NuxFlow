@@ -16,6 +16,23 @@ export default defineServerAuth((ctx) => {
     googleClientSecret?: string
     githubClientId?: string
     githubClientSecret?: string
+    public?: { siteUrl?: string }
+  }
+
+  // Derive passkey rpID and origin from the configured site URL.
+  // NUXT_PUBLIC_SITE_URL must be set in the Cloudflare Workers environment
+  // (wrangler.toml [vars] or the Cloudflare dashboard) for passkeys to work.
+  // Without it, @simplewebauthn/server rejects the credential because the
+  // expectedOrigin it derives (empty or fallback) won't match https://your-domain.com.
+  const siteUrl = (config.public?.siteUrl ?? '').replace(/\/$/, '')
+  let passkeyRpID: string | undefined
+  let passkeyOrigin: string | undefined
+  if (siteUrl) {
+    try {
+      passkeyRpID = new URL(siteUrl).hostname
+      passkeyOrigin = siteUrl
+    }
+    catch { /* malformed URL — passkey falls back to Better Auth base URL */ }
   }
 
   // D1 is cached into getD1() by the 01.d1-cache middleware which runs for every
@@ -70,7 +87,11 @@ export default defineServerAuth((ctx) => {
       },
     },
     plugins: [
-      passkey(),
+      passkey({
+        rpName: 'NuxFlow',
+        ...(passkeyRpID && { rpID: passkeyRpID }),
+        ...(passkeyOrigin && { origin: passkeyOrigin }),
+      }),
     ],
   }
 })

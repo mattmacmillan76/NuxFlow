@@ -578,9 +578,11 @@ async function deleteSite() {
             </template>
           </UCard>
 
-          <div class="mt-6">
-            <AdminPasskeyManager />
-          </div>
+          <ClientOnly>
+            <div class="mt-6">
+              <AdminPasskeyManager />
+            </div>
+          </ClientOnly>
         </template>
 
         <!-- Danger zone -->

@@ -100,6 +100,7 @@ export const passkeys = sqliteTable('passkey', {
   deviceType: text('device_type').notNull(),
   backedUp: integer('backed_up', { mode: 'boolean' }).notNull(),
   transports: text('transports'),
+  aaguid: text('aaguid'),
   createdAt: dateText('created_at').notNull().default(sql`(datetime('now'))`),
 }, (t) => [
   index('idx_passkeys_user').on(t.userId),

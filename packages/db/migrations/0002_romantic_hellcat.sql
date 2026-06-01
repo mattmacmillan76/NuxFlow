@@ -12,5 +12,4 @@ CREATE TABLE `passkey` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `idx_passkeys_user` ON `passkey` (`user_id`);--> statement-breakpoint
-ALTER TABLE `content_items` ADD `allow_comments` integer;
+CREATE INDEX `idx_passkeys_user` ON `passkey` (`user_id`);

@@ -33,7 +33,7 @@
     "@tiptap/extension-placeholder": "^3.22.5",
     "@tiptap/starter-kit": "^3.22.5",
     "@tiptap/vue-3": "^3.22.5",
-    "better-auth": "^1.6.9",
+    "better-auth": "^1.6.12",
     "drizzle-orm": "^0.45.2",
     "fflate": "^0.8.2",
     "graphql": "^16.9.0",

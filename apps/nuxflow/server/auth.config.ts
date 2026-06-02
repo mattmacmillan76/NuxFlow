@@ -19,7 +19,7 @@ export default defineServerAuth((ctx) => {
     public?: { siteUrl?: string }
   }
 
-  // Dynamically resolve request host from the active H3 event to support multi-site custom domains.
+  // Dynamically resolve request host and protocol from the active H3 event to support multi-site custom domains.
   let activeOrigin = ''
   try {
     const event = useEvent()
@@ -29,7 +29,8 @@ export default defineServerAuth((ctx) => {
         host = 'localhost'
       }
       if (host && host !== 'localhost') {
-        activeOrigin = `https://${host}`
+        const proto = getHeader(event, 'x-forwarded-proto') || 'https'
+        activeOrigin = `${proto}://${host}`
       }
     }
   } catch {
@@ -66,8 +67,9 @@ export default defineServerAuth((ctx) => {
   }
 
   return {
-    baseURL: siteUrl ? `${siteUrl}/api/auth` : undefined,
-    trustedOrigins: siteUrl ? [siteUrl] : [],
+    advanced: {
+      trustedProxyHeaders: true,
+    },
     database: drizzleAdapter(db!, {
       provider: 'sqlite',
       schema: {

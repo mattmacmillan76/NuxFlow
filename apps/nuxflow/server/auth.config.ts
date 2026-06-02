@@ -7,6 +7,7 @@ import { drizzle as drizzleD1 } from 'drizzle-orm/d1'
 import * as schema from '@nuxflow/db/schema'
 import { getD1 } from './utils/db'
 import { passkey } from '@better-auth/passkey'
+import { eq } from 'drizzle-orm'
 
 export default defineServerAuth((ctx) => {
   const config = ctx.runtimeConfig as {
@@ -69,6 +70,35 @@ export default defineServerAuth((ctx) => {
   return {
     advanced: {
       trustedProxyHeaders: true,
+    },
+    trustedOrigins: async (request) => {
+      if (!request) return []
+      try {
+        const url = new URL(request.url)
+        const host = url.hostname
+        const origin = url.origin
+
+        // Always trust loopback for dev
+        if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+          return [origin]
+        }
+
+        // Query the database to check if this domain is registered
+        const site = await db.query.sites.findFirst({
+          where: eq(schema.sites.domain, host)
+        })
+
+        if (site) {
+          return [
+            origin,
+            origin.replace(/^https:/, 'http:'),
+            origin.replace(/^http:/, 'https:')
+          ]
+        }
+      } catch (err) {
+        console.error('Error verifying trusted origin:', err)
+      }
+      return []
     },
     database: drizzleAdapter(db!, {
       provider: 'sqlite',

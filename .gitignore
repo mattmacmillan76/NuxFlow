@@ -56,3 +56,8 @@ apps/nuxflow/wrangler.toml
 # Private NuxFlow Marketing Site (Ignored)
 /nuxflow-marketing-site/
 
+# Custom Dynamic Landing Theme (Ignored)
+/nuxflow-marketing-landing/
+/nuxflow-marketing-landing.zip
+
+

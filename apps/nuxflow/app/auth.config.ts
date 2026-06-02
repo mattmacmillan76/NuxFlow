@@ -2,13 +2,19 @@ import { defineClientAuth } from '@onmax/nuxt-better-auth/config'
 import { passkeyClient } from '@better-auth/passkey/client'
 
 export default defineClientAuth((ctx) => {
-  // nuxt-site-config (via nuxt-seo-utils) sets runtimeConfig.public.siteUrl to
-  // the current request URL, which can include a path (e.g. /setup). better-auth's
-  // withPath() skips appending /api/auth when the URL already has a path, so
-  // the session endpoint ends up at /setup/get-session instead of /api/auth/get-session.
-  // Stripping to the origin here prevents that.
+  // Use the active request origin dynamically to support multi-site tenancy custom domains.
+  // Falls back to runtimeConfig.public.siteUrl if called outside a Nuxt request context.
   let origin = ctx.siteUrl
-  try { origin = new URL(ctx.siteUrl).origin } catch { /* keep as-is */ }
+  try {
+    const activeOrigin = useRequestURL().origin
+    if (activeOrigin && activeOrigin.startsWith('http')) {
+      origin = activeOrigin
+    }
+  } catch {
+    /* keep fallback */
+  }
+
+  try { origin = new URL(origin).origin } catch { /* keep as-is */ }
   return {
     baseURL: `${origin}/api/auth`,
     plugins: [

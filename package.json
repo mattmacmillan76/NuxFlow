@@ -20,14 +20,19 @@
     "@commitlint/config-conventional": "^19.0.0",
     "@commitlint/types": "^19.0.0",
     "@nuxt/eslint-config": "^0.7.0",
+    "@typescript-eslint/eslint-plugin": "^8.60.1",
+    "eslint": "^9.39.4",
     "turbo": "^2.0.0",
+    "typescript": "^6.0.3",
     "vitest": "^3.2.0",
     "wrangler": "^3.103.0"
   },
   "pnpm": {
     "overrides": {
       "better-call>zod": "^3.24.0",
-      "better-auth": "^1.6.12"
+      "better-auth": "^1.6.12",
+      "drizzle-orm": "0.45.2",
+      "kysely": "0.28.5"
     }
   },
   "engines": {

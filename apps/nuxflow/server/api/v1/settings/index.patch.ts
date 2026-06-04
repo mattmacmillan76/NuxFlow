@@ -21,6 +21,7 @@ const bodySchema = z.object({
     openaiApiKey: z.string().optional(),
     anthropicApiKey: z.string().optional(),
     geminiApiKey: z.string().optional(),
+    deepseekApiKey: z.string().optional(),
     ollamaBaseUrl: z.string().optional(),
     ollamaModel: z.string().optional(),
   }).optional(),
@@ -58,6 +59,7 @@ export default defineEventHandler(async (event) => {
     if (ai.openaiApiKey !== undefined) await saveSetting(event, 'ai.openai_api_key', ai.openaiApiKey)
     if (ai.anthropicApiKey !== undefined) await saveSetting(event, 'ai.anthropic_api_key', ai.anthropicApiKey)
     if (ai.geminiApiKey !== undefined) await saveSetting(event, 'ai.gemini_api_key', ai.geminiApiKey)
+    if (ai.deepseekApiKey !== undefined) await saveSetting(event, 'ai.deepseek_api_key', ai.deepseekApiKey)
     if (ai.ollamaBaseUrl !== undefined) await saveSetting(event, 'ai.ollama_base_url', ai.ollamaBaseUrl)
     if (ai.ollamaModel !== undefined) await saveSetting(event, 'ai.ollama_model', ai.ollamaModel)
   }

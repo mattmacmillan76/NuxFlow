@@ -15,6 +15,7 @@ const tabs = [
   { label: 'Appearance', icon: 'i-lucide-palette' },
   { label: 'Email', icon: 'i-lucide-mail' },
   { label: 'Integrations', icon: 'i-lucide-plug' },
+  { label: 'AI Settings', icon: 'i-lucide-bot' },
   { label: 'Security', icon: 'i-lucide-shield-check' },
   { label: 'Danger zone', icon: 'i-lucide-triangle-alert' },
 ]
@@ -30,6 +31,7 @@ const general = reactive({
   locale: 'en',
   timezone: 'UTC',
   status: 'active' as 'active' | 'maintenance',
+  notificationEmail: '',
 })
 
 const localeOptions = [
@@ -133,6 +135,24 @@ async function sendTestEmail() {
 // ── Integrations ─────────────────────────────────────────────────────────────
 const integrations = reactive({ turnstileSiteKey: '', analyticsId: '' })
 
+const ai = reactive({
+  provider: 'openai',
+  openaiApiKey: '',
+  anthropicApiKey: '',
+  geminiApiKey: '',
+  deepseekApiKey: '',
+  ollamaBaseUrl: 'http://localhost:11434',
+  ollamaModel: 'llama3',
+})
+
+const aiProviderOptions = [
+  { label: 'OpenAI', value: 'openai' },
+  { label: 'Anthropic', value: 'anthropic' },
+  { label: 'Google Gemini', value: 'gemini' },
+  { label: 'DeepSeek', value: 'deepseek' },
+  { label: 'Local (Ollama)', value: 'ollama' },
+]
+
 // ── Populate from API ─────────────────────────────────────────────────────────
 watch(data, (d) => {
   if (!d) return
@@ -144,6 +164,7 @@ watch(data, (d) => {
     status: d.site.status,
   })
   const s = d.settings
+  general.notificationEmail = (s['notificationEmail'] as string) ?? ''
   email.provider = (s['email.provider'] as string) ?? 'console'
   email.fromAddress = (s['email.from_address'] as string) ?? ''
   email.resendApiKey = (s['email.resend_api_key'] as string) ?? ''
@@ -159,6 +180,14 @@ watch(data, (d) => {
   appearance.showHeader = (s['frontend.show_header'] as boolean | undefined) !== false
   appearance.showColorToggle = (s['frontend.show_color_toggle'] as boolean | undefined) !== false
   appearance.faviconUrl = (s['appearance.favicon_url'] as string) ?? ''
+
+  ai.provider = (s['ai.provider'] as string) ?? 'openai'
+  ai.openaiApiKey = (s['ai.openai_api_key'] as string) ?? ''
+  ai.anthropicApiKey = (s['ai.anthropic_api_key'] as string) ?? ''
+  ai.geminiApiKey = (s['ai.gemini_api_key'] as string) ?? ''
+  ai.deepseekApiKey = (s['ai.deepseek_api_key'] as string) ?? ''
+  ai.ollamaBaseUrl = (s['ai.ollama_base_url'] as string) ?? 'http://localhost:11434'
+  ai.ollamaModel = (s['ai.ollama_model'] as string) ?? 'llama3'
 }, { immediate: true })
 
 async function save() {
@@ -179,6 +208,7 @@ async function save() {
       'frontend.show_header': appearance.showHeader,
       'frontend.show_color_toggle': appearance.showColorToggle,
       'appearance.favicon_url': appearance.faviconUrl || null,
+      'notificationEmail': general.notificationEmail || null,
     }
     await $fetch('/api/v1/settings', {
       method: 'PATCH',
@@ -189,6 +219,15 @@ async function save() {
         timezone: general.timezone,
         status: general.status,
         settings: settingsMap,
+        ai: {
+          provider: ai.provider,
+          openaiApiKey: ai.openaiApiKey,
+          anthropicApiKey: ai.anthropicApiKey,
+          geminiApiKey: ai.geminiApiKey,
+          deepseekApiKey: ai.deepseekApiKey,
+          ollamaBaseUrl: ai.ollamaBaseUrl,
+          ollamaModel: ai.ollamaModel,
+        },
       },
     })
     toast.add({ title: 'Settings saved', color: 'green' })
@@ -311,6 +350,9 @@ async function deleteSite() {
               </UFormField>
               <UFormField label="Primary domain" hint="The primary domain this site runs on (e.g. nuxflow.dev)">
                 <UInput v-model="general.domain" placeholder="example.com" />
+              </UFormField>
+              <UFormField label="Notification email" hint="The email address where contact form submissions will be sent. Falls back to your admin email address if empty.">
+                <UInput v-model="general.notificationEmail" type="email" placeholder="you@domain.com" />
               </UFormField>
               <UFormField label="Default locale">
                 <USelect v-model="general.locale" :items="localeOptions" class="w-full" />
@@ -523,6 +565,56 @@ async function deleteSite() {
               <UFormField label="Google Analytics measurement ID" hint="e.g. G-XXXXXXXXXX">
                 <UInput v-model="integrations.analyticsId" placeholder="G-XXXXXXXXXX" />
               </UFormField>
+            </div>
+            <template #footer>
+              <div class="flex justify-end">
+                <UButton :loading="saving" @click="save">Save changes</UButton>
+              </div>
+            </template>
+          </UCard>
+        </template>
+
+        <!-- AI Settings -->
+        <template v-if="active === 'AI Settings'">
+          <UCard>
+            <template #header><p class="text-sm font-semibold text-gray-900 dark:text-white">AI Configuration</p></template>
+            <div class="space-y-4">
+              <UFormField label="Provider">
+                <USelect v-model="ai.provider" :items="aiProviderOptions" class="w-full" />
+              </UFormField>
+
+              <template v-if="ai.provider === 'openai'">
+                <UFormField label="OpenAI API Key">
+                  <UInput v-model="ai.openaiApiKey" type="password" placeholder="sk-..." />
+                </UFormField>
+              </template>
+
+              <template v-if="ai.provider === 'anthropic'">
+                <UFormField label="Anthropic API Key">
+                  <UInput v-model="ai.anthropicApiKey" type="password" placeholder="sk-ant-..." />
+                </UFormField>
+              </template>
+
+              <template v-if="ai.provider === 'gemini'">
+                <UFormField label="Google Gemini API Key">
+                  <UInput v-model="ai.geminiApiKey" type="password" placeholder="AIza..." />
+                </UFormField>
+              </template>
+
+              <template v-if="ai.provider === 'deepseek'">
+                <UFormField label="DeepSeek API Key">
+                  <UInput v-model="ai.deepseekApiKey" type="password" placeholder="sk-..." />
+                </UFormField>
+              </template>
+
+              <template v-if="ai.provider === 'ollama'">
+                <UFormField label="Ollama Base URL" hint="Default: http://localhost:11434">
+                  <UInput v-model="ai.ollamaBaseUrl" placeholder="http://localhost:11434" />
+                </UFormField>
+                <UFormField label="Ollama Model" hint="Default: llama3">
+                  <UInput v-model="ai.ollamaModel" placeholder="llama3" />
+                </UFormField>
+              </template>
             </div>
             <template #footer>
               <div class="flex justify-end">

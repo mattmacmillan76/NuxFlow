@@ -36,6 +36,42 @@ async function refresh() {
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement>()
 
+// ── AI image generation ───────────────────────────────────────────────────────
+const showAiImageModal = ref(false)
+
+function onAiImageGenerated(url: string) {
+  showAiImageModal.value = false
+  refresh()
+  toast.add({ title: 'Image saved to media library', color: 'green', description: url.slice(0, 60) })
+}
+
+// ── Bulk alt text ─────────────────────────────────────────────────────────────
+const bulkAltLoading = ref(false)
+const bulkAltResult = ref<{ processed?: number; total?: number; processing?: boolean } | null>(null)
+const toast = useToast()
+
+async function runBulkAltText() {
+  bulkAltLoading.value = true
+  bulkAltResult.value = null
+  try {
+    const res = await $fetch<{ processed?: number; total?: number; processing?: boolean }>('/api/v1/ai/bulk-alt-text', {
+      method: 'POST',
+      body: {},
+    })
+    bulkAltResult.value = res
+    if (res.processing) {
+      toast.add({ title: `Generating alt text for ${res.total} images in background…`, color: 'blue' })
+    } else if (res.processed !== undefined) {
+      toast.add({ title: `Alt text generated for ${res.processed} image${res.processed !== 1 ? 's' : ''}`, color: 'green' })
+      await refresh()
+    }
+  } catch {
+    toast.add({ title: 'Failed to generate alt text', color: 'red' })
+  } finally {
+    bulkAltLoading.value = false
+  }
+}
+
 async function handleUpload(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files?.length) return
@@ -117,6 +153,23 @@ const detailFolderId = ref<string | null>(null)
 const savingDetail = ref(false)
 const deletingDetail = ref(false)
 const copied = ref(false)
+const detailAiLoading = ref(false)
+
+async function generateDetailAltText() {
+  if (!detail.value) return
+  detailAiLoading.value = true
+  try {
+    const res = await $fetch<{ altText: string }>('/api/v1/ai/alt-text', {
+      method: 'POST',
+      body: { mediaId: detail.value.id },
+    })
+    detailAltText.value = res.altText
+  } catch {
+    // AI not configured — fail silently
+  } finally {
+    detailAiLoading.value = false
+  }
+}
 
 function openDetail(file: MediaFile) {
   detail.value = file
@@ -184,9 +237,30 @@ const folderOptions = computed(() => [
   <div class="space-y-4">
     <div class="flex items-center justify-between">
       <h1 class="text-xl font-bold text-gray-900 dark:text-white">Media library</h1>
-      <UButton icon="i-lucide-upload" :loading="uploading" @click="fileInput?.click()">
-        Upload
-      </UButton>
+      <div class="flex items-center gap-2">
+        <UButton
+          icon="i-lucide-image-plus"
+          variant="outline"
+          size="sm"
+          title="Generate an image with AI"
+          @click="showAiImageModal = true"
+        >
+          AI Image
+        </UButton>
+        <UButton
+          icon="i-lucide-sparkles"
+          variant="outline"
+          size="sm"
+          :loading="bulkAltLoading"
+          title="Generate alt text for all images missing it"
+          @click="runBulkAltText"
+        >
+          Auto alt text
+        </UButton>
+        <UButton icon="i-lucide-upload" :loading="uploading" @click="fileInput?.click()">
+          Upload
+        </UButton>
+      </div>
       <input ref="fileInput" type="file" multiple class="sr-only" @change="handleUpload">
     </div>
 
@@ -357,7 +431,18 @@ const folderOptions = computed(() => [
           </div>
 
           <UFormField label="Alt text" hint="Describes the image for screen readers and SEO">
-            <UInput v-model="detailAltText" placeholder="A descriptive alt text…" />
+            <div class="flex gap-2">
+              <UInput v-model="detailAltText" class="flex-1" placeholder="A descriptive alt text…" />
+              <UButton
+                v-if="detail?.mimeType?.startsWith('image/')"
+                size="sm"
+                variant="ghost"
+                icon="i-lucide-sparkles"
+                :loading="detailAiLoading"
+                title="Generate alt text with AI"
+                @click="generateDetailAltText"
+              />
+            </div>
           </UFormField>
 
           <UFormField label="Caption">
@@ -391,6 +476,16 @@ const folderOptions = computed(() => [
             <UButton :loading="savingDetail" @click="saveDetail">Save</UButton>
           </div>
         </div>
+      </template>
+    </UModal>
+
+    <!-- AI image generation modal -->
+    <UModal v-model:open="showAiImageModal" title="Generate image with AI">
+      <template #body>
+        <MediaAiGenerateImageModal
+          @generated="(url: string, mediaId?: string) => onAiImageGenerated(url)"
+          @close="showAiImageModal = false"
+        />
       </template>
     </UModal>
   </div>

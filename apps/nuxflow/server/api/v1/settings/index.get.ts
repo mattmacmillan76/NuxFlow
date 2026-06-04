@@ -44,6 +44,7 @@ export default defineEventHandler(async (event) => {
     'ai.openai_api_key': 'openaiApiKey',
     'ai.anthropic_api_key': 'anthropicApiKey',
     'ai.gemini_api_key': 'geminiApiKey',
+    'ai.deepseek_api_key': 'deepseekApiKey',
   }
 
   const rc = useRuntimeConfig()

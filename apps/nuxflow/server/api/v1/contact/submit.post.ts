@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { forms, formSubmissions, siteSettings } from '@nuxflow/db/schema'
+import { forms, formSubmissions, siteSettings, userSiteRoles } from '@nuxflow/db/schema'
 import type { FormField } from '@nuxflow/db/schema'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { ulid } from 'ulid'
 import { useDb } from '../../../utils/db'
 import { verifyTurnstile } from '../../../utils/turnstile'
@@ -79,20 +79,39 @@ export default defineEventHandler(async (event) => {
       where: and(eq(siteSettings.siteId, siteId), eq(siteSettings.key, 'notificationEmail')),
       columns: { value: true },
     })
-    const notifyEmail = emailSetting?.value as string | undefined
-    if (notifyEmail) {
-      await sendEmail(event, {
-        to: notifyEmail,
-        subject: `New contact: ${body.subject || body.name}`,
-        html: `<p><strong>From:</strong> ${escapeHtml(body.name)} &lt;${escapeHtml(body.email)}&gt;</p>
+    let notifyEmail = emailSetting?.value as string | undefined
+
+    // Fallback: use first admin's email if no notificationEmail is set
+    if (!notifyEmail) {
+      const firstAdmin = await db.query.userSiteRoles.findFirst({
+        where: and(eq(userSiteRoles.siteId, siteId), inArray(userSiteRoles.role, ['admin', 'super_admin'])),
+        with: {
+          user: {
+            columns: { email: true }
+          }
+        }
+      })
+      notifyEmail = firstAdmin?.user?.email
+    }
+
+    if (!notifyEmail) {
+      throw new Error('No notification email address is configured, and no admin users were found to use as a fallback.')
+    }
+
+    await sendEmail(event, {
+      to: notifyEmail,
+      replyTo: body.email,
+      subject: `New contact: ${body.subject || body.name}`,
+      html: `<p><strong>From:</strong> ${escapeHtml(body.name)} &lt;${escapeHtml(body.email)}&gt;</p>
 <p><strong>Subject:</strong> ${escapeHtml(body.subject ?? '(none)')}</p>
 <p><strong>Message:</strong></p>
 <pre style="white-space:pre-wrap">${escapeHtml(body.message)}</pre>`,
-        text: `From: ${body.name} <${body.email}>\nSubject: ${body.subject ?? '(none)'}\n\n${body.message}`,
-      })
-    }
-  } catch {
-    // Submission saved; don't fail the response if email isn't configured
+      text: `From: ${body.name} <${body.email}>\nSubject: ${body.subject ?? '(none)'}\n\n${body.message}`,
+    })
+  } catch (err: unknown) {
+    console.error('Failed to send contact notification email:', err)
+    const msg = err instanceof Error ? err.message : String(err)
+    throw createError({ statusCode: 422, message: `Message saved, but failed to send email notification: ${msg}` })
   }
 
   setResponseStatus(event, 201)

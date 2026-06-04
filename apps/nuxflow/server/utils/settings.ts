@@ -23,6 +23,7 @@ export const SENSITIVE_SETTING_KEYS = new Set([
   'ai.openai_api_key',
   'ai.anthropic_api_key',
   'ai.gemini_api_key',
+  'ai.deepseek_api_key',
 ])
 
 export const SECRET_MASK = '••••••••••••••••'
@@ -55,7 +56,13 @@ export async function resolveSetting(event: H3Event, key: string, envKey?: strin
         let val = row.value as string
         if (SENSITIVE_SETTING_KEYS.has(key)) {
           const secret = rc.betterAuthSecret as string
-          val = await decryptText(val, secret)
+          try {
+            val = await decryptText(val, secret)
+          } catch {
+            // Value was stored before encryption was enforced (plaintext migration).
+            // Use the raw value — next save will encrypt it properly.
+            console.warn(`[settings] Could not decrypt ${key}, using raw stored value`)
+          }
         }
         settingsCache.set(cacheKey, { value: val, expires: Date.now() + CACHE_TTL })
         return val

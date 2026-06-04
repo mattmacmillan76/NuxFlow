@@ -49,10 +49,61 @@ function updateState() {
   boldActive.value = isActive('bold')
   italicActive.value = isActive('italic')
 }
+
+// ── AI text improvement ───────────────────────────────────────────────────────
+
+const aiLoading = ref(false)
+const aiAlternatives = ref<string[]>([])
+const showAiAlts = ref(false)
+
+const aiActions = [
+  { label: 'Improve', value: 'improve' as const },
+  { label: 'Shorten', value: 'shorten' as const },
+  { label: 'Expand', value: 'expand' as const },
+  { label: 'Simplify', value: 'simplify' as const },
+]
+
+const showAiMenu = ref(false)
+
+async function aiImprove(instruction: 'improve' | 'shorten' | 'expand' | 'simplify') {
+  const text = editorRef.value?.innerText?.trim() ?? ''
+  if (!text || aiLoading.value) return
+  showAiMenu.value = false
+  aiLoading.value = true
+  aiAlternatives.value = []
+  showAiAlts.value = false
+  try {
+    const res = await fetch('/api/v1/ai/improve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, instruction }),
+    })
+    if (res.ok) {
+      const data = await res.json() as { alternatives?: string[] }
+      if (data.alternatives?.length) {
+        aiAlternatives.value = data.alternatives
+        showAiAlts.value = true
+      }
+    }
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+function applyAiAlternative(alt: string) {
+  if (editorRef.value) {
+    settingInternally = true
+    editorRef.value.innerHTML = `<p>${alt}</p>`
+    emit('update:modelValue', editorRef.value.innerHTML)
+    setTimeout(() => { settingInternally = false }, 0)
+  }
+  showAiAlts.value = false
+  aiAlternatives.value = []
+}
 </script>
 
 <template>
-  <div class="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-primary-500">
+  <div class="border border-gray-200 dark:border-gray-700 rounded-md overflow-visible focus-within:ring-2 focus-within:ring-primary-500">
     <!-- Formatting toolbar -->
     <div class="flex items-center gap-0.5 px-2 py-1 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
       <button
@@ -123,6 +174,37 @@ function updateState() {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728M5.636 18.364a9 9 0 010-12.728M3 3l18 18" />
         </svg>
       </button>
+
+      <!-- AI improve button -->
+      <div class="ml-auto relative">
+        <button
+          type="button"
+          title="Improve with AI"
+          :disabled="aiLoading"
+          class="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-primary-500 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors"
+          @mousedown.prevent="showAiMenu = !showAiMenu"
+        >
+          <span v-if="aiLoading" class="i-lucide-loader-2 w-3 h-3 animate-spin" style="display:block;width:12px;height:12px;border:1.5px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;" />
+          <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+          </svg>
+        </button>
+        <div
+          v-if="showAiMenu"
+          class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden"
+          style="min-width: 120px;"
+        >
+          <button
+            v-for="action in aiActions"
+            :key="action.value"
+            type="button"
+            class="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            @mousedown.prevent="aiImprove(action.value)"
+          >
+            {{ action.label }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Editable content area -->
@@ -134,6 +216,27 @@ function updateState() {
       @keyup="updateState"
       @mouseup="updateState"
     />
+
+    <!-- AI alternatives -->
+    <div v-if="showAiAlts && aiAlternatives.length" class="border-t border-gray-200 dark:border-gray-700 px-3 py-2 space-y-1.5 bg-gray-50 dark:bg-gray-800/50">
+      <p class="text-xs font-medium text-gray-500 dark:text-gray-400">Pick an alternative:</p>
+      <button
+        v-for="(alt, i) in aiAlternatives"
+        :key="i"
+        type="button"
+        class="w-full text-left text-xs px-2.5 py-2 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950 transition-colors"
+        @click="applyAiAlternative(alt)"
+      >
+        {{ alt }}
+      </button>
+      <button
+        type="button"
+        class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        @click="showAiAlts = false; aiAlternatives = []"
+      >
+        Dismiss
+      </button>
+    </div>
   </div>
 </template>
 
@@ -146,4 +249,5 @@ function updateState() {
   color: #9ca3af;
   pointer-events: none;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>

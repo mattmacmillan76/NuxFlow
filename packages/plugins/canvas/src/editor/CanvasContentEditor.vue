@@ -7,6 +7,7 @@ import CanvasBlock from './CanvasBlock.vue'
 import BlockPicker from './BlockPicker.vue'
 import SettingsPanel from './SettingsPanel.vue'
 import InsertDivider from './InsertDivider.vue'
+import AiGenerateModal from './AiGenerateModal.vue'
 
 const props = defineProps<{ modelValue: unknown }>()
 const emit = defineEmits<{ 'update:modelValue': [value: CanvasContent] }>()
@@ -35,6 +36,15 @@ watch(() => props.modelValue, (val) => {
   if (isCanvasContent(val) && JSON.stringify(val) !== JSON.stringify(canvas.value))
     reset(val)
 })
+// AI generation
+
+const showAiModal = ref(false)
+
+function onAiGenerate(content: CanvasContent) {
+  reset(content)
+  showAiModal.value = false
+}
+
 
 // ── Block picker ───────────────────────────────────────────────���──────────────
 
@@ -97,15 +107,27 @@ const blockCount = computed(() => canvas.value.blocks.length)
       <span class="text-xs text-gray-400">
         {{ blockCount }} block{{ blockCount !== 1 ? 's' : '' }}
       </span>
-      <button
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 transition-colors"
-        @click="openPicker()"
-      >
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-        </svg>
-        Add block
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-xs font-medium hover:border-primary-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+          title="Generate page with AI"
+          @click="showAiModal = true"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+          </svg>
+          AI Generate
+        </button>
+        <button
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 transition-colors"
+          @click="openPicker()"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+          </svg>
+          Add block
+        </button>
+      </div>
     </div>
 
     <!-- Editor body -->
@@ -200,6 +222,14 @@ const blockCount = computed(() => canvas.value.blocks.length)
       v-if="showPicker"
       @pick="onPick"
       @close="showPicker = false"
+    />
+
+    <!-- AI generate modal -->
+    <AiGenerateModal
+      v-if="showAiModal"
+      :has-blocks="blockCount > 0"
+      @generate="onAiGenerate"
+      @close="showAiModal = false"
     />
   </div>
 </template>

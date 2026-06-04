@@ -1,7 +1,9 @@
 <script setup lang="ts">
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
+import Image from '@tiptap/extension-image'
 
 const props = defineProps<{ modelValue: unknown }>()
 const emit = defineEmits<{ 'update:modelValue': [value: unknown] }>()
@@ -22,15 +24,72 @@ const CODE_LANGUAGES = [
   { label: 'YAML', value: 'yaml' },
 ]
 
+const isMediaModalOpen = ref(false)
+
+// ── AI: floating selection toolbar ───────────────────────────────────────────
+
+const aiSelectionText = ref('')
+const aiSelectionFrom = ref(0)
+const aiSelectionTo = ref(0)
+const showAiSelectionBar = ref(false)
+const aiBarX = ref(0)
+const aiBarY = ref(0)
+let selectionDebounce: ReturnType<typeof setTimeout>
+
+const aiBarStyle = computed(() => ({
+  position: 'fixed' as const,
+  top: `${aiBarY.value}px`,
+  left: `${Math.min(aiBarX.value, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 310)}px`,
+  transform: 'translateY(-100%) translateY(-8px)',
+  zIndex: 9999,
+}))
+
+function onAiReplace(text: string) {
+  editor.value?.chain()
+    .focus()
+    .setTextSelection({ from: aiSelectionFrom.value, to: aiSelectionTo.value })
+    .insertContent(text)
+    .run()
+  showAiSelectionBar.value = false
+  aiSelectionText.value = ''
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const editor = useEditor({
   extensions: [
     StarterKit,
+    Image.configure({
+      inline: true,
+      allowBase64: true,
+    }),
     Placeholder.configure({ placeholder: 'Start writing your content here…' }),
   ],
   content: (props.modelValue as object) ?? { type: 'doc', content: [{ type: 'paragraph' }] },
   editorProps: { attributes: { class: 'nux-editor-prose' } },
   onUpdate({ editor: e }) {
     emit('update:modelValue', e.getJSON())
+  },
+  onSelectionUpdate({ editor: e }) {
+    clearTimeout(selectionDebounce)
+    const { from, to, empty } = e.state.selection
+    if (!empty) {
+      const text = e.state.doc.textBetween(from, to, ' ').trim()
+      if (text.length > 3) {
+        aiSelectionFrom.value = from
+        aiSelectionTo.value = to
+        aiSelectionText.value = text
+        const coords = e.view.coordsAtPos(from)
+        aiBarX.value = coords.left
+        aiBarY.value = coords.top
+        selectionDebounce = setTimeout(() => { showAiSelectionBar.value = true }, 350)
+        return
+      }
+    }
+    // Selection cleared or too short — hide bar (debounced so clicks inside bar don't close it)
+    selectionDebounce = setTimeout(() => {
+      if (!showAiSelectionBar.value) aiSelectionText.value = ''
+    }, 200)
   },
 })
 
@@ -40,7 +99,22 @@ watch(() => props.modelValue, (val) => {
     editor.value.commands.setContent(val as object, { emitUpdate: false })
 })
 
-onBeforeUnmount(() => editor.value?.destroy())
+onMounted(() => {
+  document.addEventListener('mousedown', onDocMouseDown)
+})
+
+onBeforeUnmount(() => {
+  editor.value?.destroy()
+  document.removeEventListener('mousedown', onDocMouseDown)
+  clearTimeout(selectionDebounce)
+})
+
+function onDocMouseDown(e: MouseEvent) {
+  const target = e.target as Element
+  if (!target.closest('.ai-selection-bar')) {
+    showAiSelectionBar.value = false
+  }
+}
 
 const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') ?? false)
 
@@ -52,6 +126,111 @@ const codeBlockLanguage = computed({
     editor.value?.chain().focus().updateAttributes('codeBlock', { language: lang || null }).run()
   },
 })
+
+// ── Media ─────────────────────────────────────────────────────────────────────
+
+function onMediaSelect(file: { url: string; altText?: string }) {
+  editor.value?.chain().focus().setImage({ src: file.url, alt: file.altText || '' }).run()
+  isMediaModalOpen.value = false
+}
+
+// ── AI: Generate content ──────────────────────────────────────────────────────
+
+const showGenerateModal = ref(false)
+const generateDescription = ref('')
+const generateTone = ref<'professional' | 'casual' | 'friendly' | 'technical'>('professional')
+const generateFormat = ref<'prose' | 'listicle' | 'howto' | 'faq'>('prose')
+const generating = ref(false)
+const generateError = ref('')
+
+const toneOptions = [
+  { label: 'Professional', value: 'professional' },
+  { label: 'Casual', value: 'casual' },
+  { label: 'Friendly', value: 'friendly' },
+  { label: 'Technical', value: 'technical' },
+]
+
+const formatOptions = [
+  { label: 'Prose', value: 'prose' },
+  { label: 'Listicle', value: 'listicle' },
+  { label: 'How-to guide', value: 'howto' },
+  { label: 'FAQ', value: 'faq' },
+]
+
+async function generateContent() {
+  if (generateDescription.value.length < 5) return
+  generating.value = true
+  generateError.value = ''
+  try {
+    const { html } = await $fetch<{ html: string }>('/api/v1/ai/generate-content', {
+      method: 'POST',
+      body: { description: generateDescription.value, tone: generateTone.value, format: generateFormat.value },
+    })
+    editor.value?.commands.setContent(html)
+    emit('update:modelValue', editor.value?.getJSON())
+    showGenerateModal.value = false
+    generateDescription.value = ''
+  } catch {
+    generateError.value = 'Generation failed. Check your AI provider settings.'
+  } finally {
+    generating.value = false
+  }
+}
+
+// ── AI: Grammar check ─────────────────────────────────────────────────────────
+
+interface Correction {
+  original: string
+  corrected: string
+  reason: string
+}
+
+const showGrammarPanel = ref(false)
+const grammarLoading = ref(false)
+const corrections = ref<Correction[]>([])
+const grammarChecked = ref(false)
+
+function extractPlainText(): string {
+  if (!editor.value) return ''
+  return editor.value.getText()
+}
+
+async function checkGrammar() {
+  const text = extractPlainText()
+  if (!text.trim()) return
+  grammarLoading.value = true
+  corrections.value = []
+  grammarChecked.value = false
+  try {
+    const res = await $fetch<{ corrections: Correction[] }>('/api/v1/ai/grammar', {
+      method: 'POST',
+      body: { text },
+    })
+    corrections.value = res.corrections
+    grammarChecked.value = true
+  } finally {
+    grammarLoading.value = false
+  }
+}
+
+function applyCorrection(c: Correction) {
+  if (!editor.value) return
+  const { state, dispatch } = editor.value.view
+  const { doc, tr } = state
+  let found = false
+  doc.descendants((node, pos) => {
+    if (found || node.type.name !== 'text') return
+    const idx = node.text?.indexOf(c.original) ?? -1
+    if (idx === -1) return
+    const from = pos + idx
+    const to = from + c.original.length
+    dispatch(tr.replaceWith(from, to, state.schema.text(c.corrected)))
+    found = true
+  })
+  corrections.value = corrections.value.filter(x => x !== c)
+}
+
+// ── Toolbar definition ────────────────────────────────────────────────────────
 
 interface ToolItem {
   icon: string
@@ -80,28 +259,34 @@ const tools = computed((): ToolGroup[] => {
     {
       group: 'headings',
       items: [
-        { icon: 'i-lucide-heading-1', label: 'Heading 1', active: e.isActive('heading', { level: 1 }), action: () => e.chain().focus().toggleHeading({ level: 1 }).run() },
-        { icon: 'i-lucide-heading-2', label: 'Heading 2', active: e.isActive('heading', { level: 2 }), action: () => e.chain().focus().toggleHeading({ level: 2 }).run() },
-        { icon: 'i-lucide-heading-3', label: 'Heading 3', active: e.isActive('heading', { level: 3 }), action: () => e.chain().focus().toggleHeading({ level: 3 }).run() },
+        { icon: 'i-lucide-heading-1', label: 'Heading 1', active: e.isActive('heading', { level: 1 }), action: () => (e.chain().focus() as any).toggleHeading({ level: 1 }).run() },
+        { icon: 'i-lucide-heading-2', label: 'Heading 2', active: e.isActive('heading', { level: 2 }), action: () => (e.chain().focus() as any).toggleHeading({ level: 2 }).run() },
+        { icon: 'i-lucide-heading-3', label: 'Heading 3', active: e.isActive('heading', { level: 3 }), action: () => (e.chain().focus() as any).toggleHeading({ level: 3 }).run() },
       ],
     },
     {
       group: 'marks',
       items: [
-        { icon: 'i-lucide-bold', label: 'Bold', active: e.isActive('bold'), action: () => e.chain().focus().toggleBold().run() },
-        { icon: 'i-lucide-italic', label: 'Italic', active: e.isActive('italic'), action: () => e.chain().focus().toggleItalic().run() },
-        { icon: 'i-lucide-strikethrough', label: 'Strikethrough', active: e.isActive('strike'), action: () => e.chain().focus().toggleStrike().run() },
-        { icon: 'i-lucide-code', label: 'Inline code', active: e.isActive('code'), action: () => e.chain().focus().toggleCode().run() },
+        { icon: 'i-lucide-bold', label: 'Bold', active: e.isActive('bold'), action: () => (e.chain().focus() as any).toggleBold().run() },
+        { icon: 'i-lucide-italic', label: 'Italic', active: e.isActive('italic'), action: () => (e.chain().focus() as any).toggleItalic().run() },
+        { icon: 'i-lucide-strikethrough', label: 'Strikethrough', active: e.isActive('strike'), action: () => (e.chain().focus() as any).toggleStrike().run() },
+        { icon: 'i-lucide-code', label: 'Inline code', active: e.isActive('code'), action: () => (e.chain().focus() as any).toggleCode().run() },
       ],
     },
     {
       group: 'blocks',
       items: [
-        { icon: 'i-lucide-list', label: 'Bullet list', active: e.isActive('bulletList'), action: () => e.chain().focus().toggleBulletList().run() },
-        { icon: 'i-lucide-list-ordered', label: 'Ordered list', active: e.isActive('orderedList'), action: () => e.chain().focus().toggleOrderedList().run() },
-        { icon: 'i-lucide-text-quote', label: 'Blockquote', active: e.isActive('blockquote'), action: () => e.chain().focus().toggleBlockquote().run() },
-        { icon: 'i-lucide-square-code', label: 'Code block', active: e.isActive('codeBlock'), action: () => e.chain().focus().toggleCodeBlock().run() },
-        { icon: 'i-lucide-minus', label: 'Divider', action: () => e.chain().focus().setHorizontalRule().run() },
+        { icon: 'i-lucide-list', label: 'Bullet list', active: e.isActive('bulletList'), action: () => (e.chain().focus() as any).toggleBulletList().run() },
+        { icon: 'i-lucide-list-ordered', label: 'Ordered list', active: e.isActive('orderedList'), action: () => (e.chain().focus() as any).toggleOrderedList().run() },
+        { icon: 'i-lucide-text-quote', label: 'Blockquote', active: e.isActive('blockquote'), action: () => (e.chain().focus() as any).toggleBlockquote().run() },
+        { icon: 'i-lucide-square-code', label: 'Code block', active: e.isActive('codeBlock'), action: () => (e.chain().focus() as any).toggleCodeBlock().run() },
+        { icon: 'i-lucide-minus', label: 'Divider', action: () => (e.chain().focus() as any).setHorizontalRule().run() },
+      ],
+    },
+    {
+      group: 'inserts',
+      items: [
+        { icon: 'i-lucide-image', label: 'Insert Image', action: () => { isMediaModalOpen.value = true } },
       ],
     },
   ]
@@ -129,6 +314,7 @@ const tools = computed((): ToolGroup[] => {
         />
         <div class="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1 last:hidden" />
       </template>
+
       <select
         v-if="isCodeBlockActive"
         v-model="codeBlockLanguage"
@@ -137,12 +323,134 @@ const tools = computed((): ToolGroup[] => {
       >
         <option v-for="lang in CODE_LANGUAGES" :key="lang.value" :value="lang.value">{{ lang.label }}</option>
       </select>
+
+      <!-- AI toolbar -->
+      <div class="ml-auto flex items-center gap-1">
+        <div class="w-px h-4 bg-gray-200 dark:bg-gray-700 mr-1" />
+        <UButton
+          icon="i-lucide-sparkles"
+          size="xs"
+          color="primary"
+          variant="ghost"
+          title="Generate content with AI"
+          @click="showGenerateModal = true"
+        />
+        <UButton
+          icon="i-lucide-spell-check"
+          size="xs"
+          :color="showGrammarPanel ? 'primary' : 'neutral'"
+          :variant="showGrammarPanel ? 'soft' : 'ghost'"
+          title="Grammar & spell check"
+          @click="showGrammarPanel = !showGrammarPanel; showGrammarPanel && checkGrammar()"
+        />
+      </div>
+    </div>
+
+    <!-- Grammar panel -->
+    <div
+      v-if="showGrammarPanel"
+      class="border-b border-gray-200 dark:border-gray-800 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-3"
+    >
+      <div class="flex items-center justify-between mb-2">
+        <p class="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+          <UIcon name="i-lucide-spell-check" class="w-3.5 h-3.5" />
+          Grammar &amp; Style
+        </p>
+        <div class="flex items-center gap-2">
+          <UButton size="xs" variant="ghost" :loading="grammarLoading" icon="i-lucide-refresh-cw" @click="checkGrammar">
+            Re-check
+          </UButton>
+          <UButton size="xs" variant="ghost" icon="i-lucide-x" @click="showGrammarPanel = false" />
+        </div>
+      </div>
+      <div v-if="grammarLoading" class="text-xs text-gray-400 flex items-center gap-1.5 py-1">
+        <UIcon name="i-lucide-loader-2" class="w-3.5 h-3.5 animate-spin" />
+        Checking…
+      </div>
+      <div v-else-if="grammarChecked && corrections.length === 0" class="text-xs text-green-600 dark:text-green-400 flex items-center gap-1.5 py-1">
+        <UIcon name="i-lucide-check-circle" class="w-3.5 h-3.5" />
+        No issues found.
+      </div>
+      <div v-else class="space-y-1.5 max-h-40 overflow-y-auto">
+        <div
+          v-for="(c, i) in corrections"
+          :key="i"
+          class="flex items-start gap-2 rounded-lg bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs"
+        >
+          <div class="flex-1 min-w-0">
+            <span class="text-red-500 line-through">{{ c.original }}</span>
+            <span class="mx-1 text-gray-400">→</span>
+            <span class="text-green-600 dark:text-green-400 font-medium">{{ c.corrected }}</span>
+            <span class="ml-2 text-gray-400">{{ c.reason }}</span>
+          </div>
+          <UButton size="xs" variant="ghost" color="green" @click="applyCorrection(c)">Apply</UButton>
+        </div>
+      </div>
     </div>
 
     <!-- Editable area -->
     <div class="flex-1 px-5 py-4 cursor-text" @click="editor?.commands.focus()">
       <EditorContent :editor="editor" class="h-full" />
     </div>
+
+    <!-- Floating AI toolbar — appears above text selections -->
+    <Teleport to="body">
+      <div
+        v-if="showAiSelectionBar && aiSelectionText"
+        class="ai-selection-bar"
+        :style="aiBarStyle"
+        @mousedown.prevent
+      >
+        <EditorAiToolbar
+          :selected-text="aiSelectionText"
+          @replace="onAiReplace"
+        />
+      </div>
+    </Teleport>
+
+    <!-- Media Modal -->
+    <UModal v-model:open="isMediaModalOpen" title="Select Media">
+      <template #body>
+        <EditorMediaPicker @select="onMediaSelect" />
+      </template>
+    </UModal>
+
+    <!-- AI Generate Modal -->
+    <UModal v-model:open="showGenerateModal" title="Generate content with AI">
+      <template #body>
+        <div class="space-y-4">
+          <UFormField label="Describe what you want to write">
+            <UTextarea
+              v-model="generateDescription"
+              :rows="3"
+              placeholder="e.g. An introduction to Cloudflare Workers explaining what they are and why developers should use them."
+            />
+          </UFormField>
+          <div class="grid grid-cols-2 gap-3">
+            <UFormField label="Tone">
+              <USelect v-model="generateTone" :items="toneOptions" />
+            </UFormField>
+            <UFormField label="Format">
+              <USelect v-model="generateFormat" :items="formatOptions" />
+            </UFormField>
+          </div>
+          <p v-if="generateError" class="text-sm text-red-500">{{ generateError }}</p>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton variant="ghost" @click="showGenerateModal = false">Cancel</UButton>
+          <UButton
+            icon="i-lucide-sparkles"
+            :loading="generating"
+            :disabled="generateDescription.length < 5"
+            @click="generateContent"
+          >
+            Generate
+          </UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
 
@@ -200,4 +508,5 @@ const tools = computed((): ToolGroup[] => {
 .nux-editor-prose li + li { margin-top: .25rem; }
 .nux-editor-prose hr { border: none; border-top: 1px solid rgba(0,0,0,.12); margin: 1.5rem 0; }
 .dark .nux-editor-prose hr { border-top-color: rgba(255,255,255,.12); }
+.nux-editor-prose img { max-width: 100%; height: auto; border-radius: 0.5rem; margin-top: 1rem; margin-bottom: 1rem; display: inline-block; }
 </style>

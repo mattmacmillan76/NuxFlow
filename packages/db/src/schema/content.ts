@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
+import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { sites } from './sites'
 import { users } from './users'
 
@@ -40,12 +41,16 @@ export const contentItems = sqliteTable('content_items', {
   previewTokenExpiresAt: text('preview_token_expires_at'),
   settings: text('settings', { mode: 'json' }).$type<Record<string, unknown>>(),
   allowComments: integer('allow_comments', { mode: 'boolean' }),
+  locale: text('locale').notNull().default('en'),
+  sourceItemId: text('source_item_id').references((): AnySQLiteColumn => contentItems.id, { onDelete: 'set null' }),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
 }, (t) => [
   index('idx_content_items_site_type').on(t.siteId, t.typeId),
   index('idx_content_items_site_slug').on(t.siteId, t.slug),
   index('idx_content_items_status').on(t.status),
+  index('idx_content_items_locale').on(t.siteId, t.locale),
+  index('idx_content_items_source').on(t.sourceItemId),
 ])
 
 export const contentRevisions = sqliteTable('content_revisions', {

@@ -99,6 +99,13 @@ const saving = ref(false)
 const lastSaved = ref<Date | null>(null)
 const saveError = ref('')
 const showRevisions = ref(false)
+const showTranslateModal = ref(false)
+
+const router = useRouter()
+function onTranslated(newId: string) {
+  showTranslateModal.value = false
+  router.push(`/admin/content/${newId}`)
+}
 
 let autoSaveTimer: ReturnType<typeof setTimeout>
 watch(form, () => {
@@ -197,6 +204,16 @@ onUnmounted(() => clearTimeout(autoSaveTimer))
           </button>
         </div>
 
+        <UButton
+          v-if="!isNew"
+          variant="ghost"
+          size="sm"
+          icon="i-lucide-languages"
+          title="Translate with AI"
+          @click="showTranslateModal = true"
+        >
+          Translate
+        </UButton>
         <UButton variant="ghost" size="sm" icon="i-lucide-history" @click="showRevisions = !showRevisions">
           Revisions
         </UButton>
@@ -295,5 +312,17 @@ onUnmounted(() => clearTimeout(autoSaveTimer))
         />
       </div>
     </div>
+
+    <!-- Translate modal -->
+    <UModal v-model:open="showTranslateModal" title="Translate with AI">
+      <template #body>
+        <EditorTranslateModal
+          v-if="!isNew"
+          :content-item-id="id"
+          @translated="(newId: string) => onTranslated(newId)"
+          @close="showTranslateModal = false"
+        />
+      </template>
+    </UModal>
   </div>
 </template>

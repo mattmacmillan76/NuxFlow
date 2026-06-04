@@ -4,6 +4,7 @@ import { OpenAiProvider } from './openai'
 import { AnthropicProvider } from './anthropic'
 import { GeminiProvider } from './gemini'
 import { OllamaProvider } from './ollama'
+import { DeepSeekProvider } from './deepseek'
 
 export interface AiCompletionOptions {
   temperature?: number
@@ -20,24 +21,37 @@ export interface AiProvider {
 export async function getAiProvider(event: H3Event): Promise<AiProvider | null> {
   const provider = await resolveSetting(event, 'ai.provider', 'aiProvider') as string | undefined
 
+  let p: AiProvider | null = null
+
   switch (provider) {
     case 'openai': {
       const apiKey = await resolveSetting(event, 'ai.openai_api_key', 'openaiApiKey')
-      return new OpenAiProvider(apiKey)
+      p = new OpenAiProvider(apiKey)
+      break
     }
     case 'anthropic': {
       const apiKey = await resolveSetting(event, 'ai.anthropic_api_key', 'anthropicApiKey')
-      return new AnthropicProvider(apiKey)
+      p = new AnthropicProvider(apiKey)
+      break
     }
     case 'gemini': {
       const apiKey = await resolveSetting(event, 'ai.gemini_api_key', 'geminiApiKey')
-      return new GeminiProvider(apiKey)
+      p = new GeminiProvider(apiKey)
+      break
     }
     case 'ollama': {
       const url = await resolveSetting(event, 'ai.ollama_base_url', 'ollamaUrl')
       const model = await resolveSetting(event, 'ai.ollama_model', 'ollamaModel')
-      return new OllamaProvider(url, model)
+      p = new OllamaProvider(url, model)
+      break
     }
-    default: return null
+    case 'deepseek': {
+      const apiKey = await resolveSetting(event, 'ai.deepseek_api_key', 'deepseekApiKey')
+      p = new DeepSeekProvider(apiKey)
+      break
+    }
   }
+
+  // Return null if key is missing — callers throw 503 on null
+  return p?.isConfigured() ? p : null
 }

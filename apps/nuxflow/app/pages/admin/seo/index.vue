@@ -37,6 +37,25 @@ watch(settingsData, (d) => {
 }, { immediate: true })
 
 const savingGlobal = ref(false)
+const aiSuggestLoading = ref(false)
+
+async function aiSuggestGlobal() {
+  const title = seo.title || settingsData.value?.site?.name || ''
+  if (!title) return
+  aiSuggestLoading.value = true
+  try {
+    const res = await $fetch<{ seoTitle: string; seoDescription: string }>('/api/v1/ai/seo-suggest', {
+      method: 'POST',
+      body: { title },
+    })
+    if (res.seoTitle) seo.title = res.seoTitle
+    if (res.seoDescription) seo.description = res.seoDescription
+  } catch {
+    // AI not configured — fail silently
+  } finally {
+    aiSuggestLoading.value = false
+  }
+}
 
 async function saveGlobal() {
   savingGlobal.value = true
@@ -163,16 +182,37 @@ const columns = [
         <template v-if="active === 'Global defaults'">
           <UCard>
             <template #header>
-              <p class="text-sm font-semibold text-gray-900 dark:text-white">Global SEO defaults</p>
-              <p class="text-xs text-gray-400 mt-0.5">Applied to pages that don't have their own SEO fields set</p>
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-semibold text-gray-900 dark:text-white">Global SEO defaults</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Applied to pages that don't have their own SEO fields set</p>
+                </div>
+                <UButton
+                  icon="i-lucide-sparkles"
+                  size="sm"
+                  variant="outline"
+                  :loading="aiSuggestLoading"
+                  :disabled="!seo.title && !settingsData?.site?.name"
+                  title="Generate title and description with AI"
+                  @click="aiSuggestGlobal"
+                >
+                  AI Suggest
+                </UButton>
+              </div>
             </template>
             <div class="space-y-4">
               <UFormField label="Default site title" hint="Used as fallback og:title and <title>">
                 <UInput v-model="seo.title" placeholder="My Site — The best CMS" class="w-full" />
+                <p class="mt-1 text-xs" :class="seo.title.length > 60 ? 'text-amber-500' : 'text-gray-400'">
+                  {{ seo.title.length }} / 60 characters
+                </p>
               </UFormField>
 
               <UFormField label="Default meta description" hint="Fallback description for search results">
                 <UTextarea v-model="seo.description" :rows="3" placeholder="A short description of your site shown in search results…" class="w-full" />
+                <p class="mt-1 text-xs" :class="seo.description.length > 160 ? 'text-amber-500' : 'text-gray-400'">
+                  {{ seo.description.length }} / 160 characters
+                </p>
               </UFormField>
 
               <UFormField label="Canonical URL prefix" hint="Base URL used to build canonical tags, e.g. https://example.com">

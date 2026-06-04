@@ -5,6 +5,7 @@ const providers = [
   { value: 'openai', label: 'OpenAI', icon: 'i-simple-icons-openai', envKey: 'NUXT_OPENAI_API_KEY' },
   { value: 'anthropic', label: 'Anthropic', icon: 'i-simple-icons-anthropic', envKey: 'NUXT_ANTHROPIC_API_KEY' },
   { value: 'gemini', label: 'Google Gemini', icon: 'i-simple-icons-google', envKey: 'NUXT_GEMINI_API_KEY' },
+  { value: 'deepseek', label: 'DeepSeek', icon: 'i-lucide-brain-circuit', envKey: 'NUXT_DEEPSEEK_API_KEY' },
   { value: 'ollama', label: 'Ollama (local)', icon: 'i-lucide-cpu', envKey: 'NUXT_OLLAMA_BASE_URL' },
 ]
 
@@ -13,6 +14,7 @@ const form = reactive({
   openaiApiKey: '',
   anthropicApiKey: '',
   geminiApiKey: '',
+  deepseekApiKey: '',
   ollamaBaseUrl: 'http://localhost:11434',
   ollamaModel: 'llama3.2',
 })
@@ -36,6 +38,7 @@ watch(data, (d) => {
   form.openaiApiKey = (s['ai.openai_api_key'] as string) ?? ''
   form.anthropicApiKey = (s['ai.anthropic_api_key'] as string) ?? ''
   form.geminiApiKey = (s['ai.gemini_api_key'] as string) ?? ''
+  form.deepseekApiKey = (s['ai.deepseek_api_key'] as string) ?? ''
   form.ollamaBaseUrl = (s['ai.ollama_base_url'] as string) ?? 'http://localhost:11434'
   form.ollamaModel = (s['ai.ollama_model'] as string) ?? 'llama3.2'
 }, { immediate: true })
@@ -105,6 +108,12 @@ async function test() {
         <template v-if="form.provider === 'gemini'">
           <UFormField label="Google Gemini API key">
             <UInput v-model="form.geminiApiKey" type="password" placeholder="AIza..." />
+          </UFormField>
+        </template>
+
+        <template v-if="form.provider === 'deepseek'">
+          <UFormField label="DeepSeek API key" hint="sk-...">
+            <UInput v-model="form.deepseekApiKey" type="password" placeholder="sk-..." />
           </UFormField>
         </template>
 

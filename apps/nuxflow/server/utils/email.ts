@@ -13,6 +13,7 @@ interface EmailMessage {
   html: string
   text?: string
   from?: string
+  replyTo?: string
 }
 
 interface EmailConfig {
@@ -55,6 +56,7 @@ async function sendViaResend(msg: EmailMessage, config: EmailConfig): Promise<vo
       subject: msg.subject,
       html: msg.html,
       text: msg.text,
+      ...(msg.replyTo ? { reply_to: msg.replyTo } : {}),
     }),
   })
   if (!res.ok) throw new Error(`Resend error ${res.status}: ${await res.text()}`)
@@ -71,6 +73,7 @@ async function sendViaBrevo(msg: EmailMessage, config: EmailConfig): Promise<voi
     body: JSON.stringify({
       sender: { email: from },
       to: (Array.isArray(msg.to) ? msg.to : [msg.to]).map(e => ({ email: e })),
+      ...(msg.replyTo ? { replyTo: { email: msg.replyTo } } : {}),
       subject: msg.subject,
       htmlContent: msg.html,
       textContent: msg.text,
@@ -90,6 +93,7 @@ async function sendViaZepto(msg: EmailMessage, config: EmailConfig): Promise<voi
     body: JSON.stringify({
       from: { address: from },
       to: (Array.isArray(msg.to) ? msg.to : [msg.to]).map(e => ({ email_address: { address: e } })),
+      ...(msg.replyTo ? { reply_to: { address: msg.replyTo } } : {}),
       subject: msg.subject,
       htmlbody: msg.html,
       textbody: msg.text,
@@ -108,6 +112,7 @@ async function sendViaSmtp(msg: EmailMessage, config: EmailConfig): Promise<void
     body: JSON.stringify({
       personalizations: [{ to: (Array.isArray(msg.to) ? msg.to : [msg.to]).map(e => ({ email: e })) }],
       from: { email: from },
+      ...(msg.replyTo ? { reply_to: { email: msg.replyTo } } : {}),
       subject: msg.subject,
       content: [
         { type: 'text/html', value: msg.html },

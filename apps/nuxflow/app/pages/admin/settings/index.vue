@@ -381,7 +381,7 @@ async function deleteSite() {
         <template v-if="active === 'Appearance'">
           <UAlert
             icon="i-lucide-palette"
-            color="blue"
+            color="primary"
             variant="soft"
             title="Colour scheme, accent colour &amp; body font"
             description="These appearance settings live under Themes → Appearance alongside your active theme controls."
@@ -467,7 +467,7 @@ async function deleteSite() {
               </UFormField>
 
               <template v-if="email.provider !== 'console'">
-                <UFormField label="From address" hint="Optional — defaults to noreply@nuxflow.dev">
+                <UFormField label="From address" :hint="`Optional — defaults to noreply@${general.domain || 'yourdomain.com'}`">
                   <UInput v-model="email.fromAddress" type="email" placeholder="noreply@yourdomain.com" />
                 </UFormField>
               </template>

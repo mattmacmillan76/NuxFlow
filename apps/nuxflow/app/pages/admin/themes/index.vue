@@ -297,7 +297,15 @@ const swatches = [
               <p class="font-medium text-gray-900 dark:text-white text-sm">Default</p>
               <p class="text-xs text-gray-500 dark:text-gray-400">Built-in · always available</p>
             </div>
-            <UBadge v-if="defaultIsActive" color="green" variant="soft" size="xs">Active</UBadge>
+            <UBadge
+              v-if="defaultIsActive"
+              variant="outline"
+              color="green"
+              class="!text-emerald-700 dark:!text-emerald-300 !bg-emerald-50 dark:!bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800"
+              size="xs"
+            >
+              Active
+            </UBadge>
             <UButton
               v-else
               size="xs"
@@ -341,6 +349,8 @@ const swatches = [
                 v-if="theme.hasCss"
                 size="xs"
                 variant="ghost"
+                color="gray"
+                class="!text-gray-700 dark:!text-gray-300 hover:!bg-gray-100 dark:hover:!bg-gray-800"
                 icon="i-lucide-pencil"
                 title="Edit CSS"
                 @click="openEdit(theme)"
@@ -349,6 +359,8 @@ const swatches = [
                 v-if="!theme.hasCss"
                 size="xs"
                 variant="ghost"
+                color="gray"
+                class="!text-gray-700 dark:!text-gray-300 hover:!bg-gray-100 dark:hover:!bg-gray-800"
                 icon="i-lucide-eye"
                 :loading="previewingId === theme.id"
                 title="Preview"
@@ -357,18 +369,29 @@ const swatches = [
               <UButton
                 v-if="theme.settings?.hasDemoContent"
                 size="xs"
+                variant="outline"
                 color="blue"
-                variant="soft"
+                class="!text-blue-700 dark:!text-blue-300 !bg-blue-50 dark:!bg-blue-950/20 hover:!bg-blue-100 dark:hover:!bg-blue-900/30 border border-blue-200 dark:border-blue-800 transition-colors"
                 icon="i-lucide-sparkles"
                 @click="importDemoContent(theme.id)"
               >
                 Demo content
               </UButton>
-              <UBadge v-if="theme.isActive" color="green" variant="soft" size="xs">Active</UBadge>
+              <UBadge
+                v-if="theme.isActive"
+                variant="outline"
+                color="green"
+                class="!text-emerald-700 dark:!text-emerald-300 !bg-emerald-50 dark:!bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800"
+                size="xs"
+              >
+                Active
+              </UBadge>
               <UButton
                 v-else
                 size="xs"
                 variant="outline"
+                color="gray"
+                class="!text-gray-700 dark:!text-gray-300 hover:!bg-gray-50 dark:hover:!bg-gray-800 border border-gray-200 dark:border-gray-700 transition-colors"
                 :loading="activatingId === theme.id"
                 @click="activate(theme.id)"
               >
@@ -380,6 +403,7 @@ const swatches = [
                 color="red"
                 variant="ghost"
                 icon="i-lucide-trash-2"
+                class="!text-red-500 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-950/20"
                 :loading="deletingId === theme.id"
                 @click="deleteTheme(theme)"
               />
@@ -458,7 +482,7 @@ const swatches = [
 
       <UCard>
         <template #header>
-          <p class="text-sm font-semibold">Global appearance</p>
+          <p class="text-sm font-semibold text-gray-900 dark:text-white">Global appearance</p>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Controls the visual style applied across your site</p>
         </template>
 

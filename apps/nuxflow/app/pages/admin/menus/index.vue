@@ -139,7 +139,7 @@ onMounted(() => { if (!data.value) refresh() })
             size="xs"
             icon="i-lucide-trash-2"
             color="red"
-            class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            class="shrink-0 !text-red-500 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-950/20"
             @click.prevent="deleteId = menu.id"
           />
         </div>

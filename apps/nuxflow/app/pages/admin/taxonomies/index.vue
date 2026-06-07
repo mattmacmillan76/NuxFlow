@@ -134,6 +134,7 @@ async function deleteTerm(termId: string) {
                 size="xs"
                 color="red"
                 variant="ghost"
+                class="!text-red-500 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-950/20"
                 @click.stop="deleteId = tax.id"
               />
             </div>
@@ -176,7 +177,7 @@ async function deleteTerm(termId: string) {
                   size="xs"
                   variant="ghost"
                   color="red"
-                  class="opacity-0 group-hover:opacity-100 transition-opacity"
+                  class="!text-red-500 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-950/20"
                   @click="deleteTerm(term.id)"
                 />
               </div>

@@ -2,7 +2,6 @@
 definePageMeta({ layout: 'admin', middleware: ['auth'] })
 
 const auth = useAuthStore()
-const toast = useToast()
 
 const hour = new Date().getHours()
 const greeting = computed(() => hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening')
@@ -14,28 +13,12 @@ const { data: stats } = await useFetch<{
   users: number
 }>('/api/v1/stats')
 
-const { data: homepageData, refresh: refreshHomepage } = await useFetch<{
+const { data: homepageData } = await useFetch<{
   homepage: { id: string; title: string; hasCustomContent: boolean; updatedAt: string } | null
 }>('/api/v1/homepage')
 
 const homepage = computed(() => homepageData.value?.homepage ?? null)
 
-const resettingHomepage = ref(false)
-
-async function resetHomepage() {
-  if (!confirm('Reset the homepage to the default NuxFlow template? Your custom content will be cleared.')) return
-  resettingHomepage.value = true
-  try {
-    await $fetch('/api/v1/homepage/reset', { method: 'POST' })
-    await refreshHomepage()
-    toast.add({ title: 'Homepage reset to default', color: 'green' })
-  } catch (e: unknown) {
-    const msg = (e as { data?: { message?: string } })?.data?.message ?? 'Reset failed'
-    toast.add({ title: msg, color: 'red' })
-  } finally {
-    resettingHomepage.value = false
-  }
-}
 
 const statCards = computed(() => [
   {
@@ -121,17 +104,7 @@ const statCards = computed(() => [
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <UButton
-            v-if="homepage.hasCustomContent"
-            size="xs"
-            color="neutral"
-            variant="outline"
-            icon="i-lucide-rotate-ccw"
-            :loading="resettingHomepage"
-            @click="resetHomepage"
-          >
-            Reset
-          </UButton>
+
           <UButton
             :to="`/admin/content/${homepage.id}`"
             size="xs"
@@ -149,7 +122,7 @@ const statCards = computed(() => [
       <div class="flex flex-wrap gap-3">
         <UButton to="/admin/content/new" icon="i-lucide-plus">New page</UButton>
         <UButton to="/admin/media" variant="outline" icon="i-lucide-upload">Upload media</UButton>
-        <UButton to="/admin/forms/new" variant="outline" icon="i-lucide-list-plus">New form</UButton>
+        <UButton to="/admin/forms/new/edit" variant="outline" icon="i-lucide-list-plus">New form</UButton>
         <UButton to="/admin/settings" variant="outline" icon="i-lucide-settings">Settings</UButton>
       </div>
     </div>

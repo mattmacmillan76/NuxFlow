@@ -2,8 +2,7 @@
 import { ref, computed } from 'vue'
 import { CANVAS_BLOCKS, getPluginBlockDefinitions } from '../blocks/definitions'
 
-const tabs = ['Blocks', 'Settings'] as const
-const active = ref<typeof tabs[number]>('Blocks')
+
 
 const categories = ['layout', 'content', 'media', 'cta'] as const
 
@@ -33,23 +32,7 @@ const pluginBlocks = computed(() => getPluginBlockDefinitions())
       </span>
     </div>
 
-    <!-- Tab nav -->
-    <div class="flex gap-1 border-b border-gray-200 dark:border-gray-800">
-      <button
-        v-for="tab in tabs"
-        :key="tab"
-        class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
-        :class="active === tab
-          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-          : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
-        @click="active = tab"
-      >
-        {{ tab }}
-      </button>
-    </div>
 
-    <!-- Blocks tab -->
-    <template v-if="active === 'Blocks'">
       <p class="text-sm text-gray-500">
         The following blocks are available in the Canvas editor. Activate Canvas mode on any page from the content editor.
       </p>
@@ -86,13 +69,6 @@ const pluginBlocks = computed(() => getPluginBlockDefinitions())
           </div>
         </div>
       </div>
-    </template>
 
-    <!-- Settings tab -->
-    <template v-if="active === 'Settings'">
-      <div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 text-center">
-        <p class="text-sm text-gray-500">No additional settings for Canvas at this time.</p>
-      </div>
-    </template>
   </div>
 </template>

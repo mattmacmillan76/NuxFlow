@@ -42,7 +42,7 @@ watch(() => route.path, () => { mobileOpen.value = false })
       </NuxtLink>
 
       <!-- Desktop nav -->
-      <nav v-if="navItems.length" class="hidden md:flex items-center gap-1 flex-1">
+      <nav v-if="navItems.length" class="hidden lg:flex items-center gap-1 flex-1">
         <template v-for="item in navItems" :key="item.id">
           <!-- Item with dropdown -->
           <div v-if="item.children && item.children.length > 0" class="relative group">
@@ -89,7 +89,7 @@ watch(() => route.path, () => { mobileOpen.value = false })
         <!-- Mobile hamburger -->
         <button
           v-if="navItems.length"
-          class="md:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-gray-600 dark:text-gray-400"
+          class="lg:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-gray-600 dark:text-gray-400"
           :aria-label="mobileOpen ? 'Close menu' : 'Open menu'"
           @click="mobileOpen = !mobileOpen"
         >
@@ -107,7 +107,7 @@ watch(() => route.path, () => { mobileOpen.value = false })
       leave-from-class="max-h-96 opacity-100"
       leave-to-class="max-h-0 opacity-0"
     >
-      <nav v-if="mobileOpen" class="md:hidden border-t border-gray-200 dark:border-gray-700 px-4 py-3 space-y-1">
+      <nav v-if="mobileOpen" class="lg:hidden border-t border-gray-200 dark:border-gray-700 px-4 py-3 space-y-1">
         <template v-for="item in navItems" :key="item.id">
           <NuxtLink
             :to="href(item)"

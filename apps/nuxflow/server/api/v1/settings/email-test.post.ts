@@ -76,6 +76,11 @@ export default defineEventHandler(async (event) => {
     smtpUser = await resolveSetting(event, 'email.smtp_user', 'smtpUser')
   }
 
+  let host = getHeader(event, 'host')?.split(':')[0] ?? 'nuxflow.app'
+  if (host === '127.0.0.1' || host === '::1') {
+    host = 'localhost'
+  }
+
   try {
     await sendEmailWithConfig(
       {
@@ -88,6 +93,7 @@ export default defineEventHandler(async (event) => {
         smtpPort,
         smtpUser,
         smtpPass,
+        domain: host,
       },
       {
         to: sendTo,

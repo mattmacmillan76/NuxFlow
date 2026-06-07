@@ -198,7 +198,7 @@ function itemHref(item: MenuItem | ChildItem) {
               <div class="flex items-center gap-1 shrink-0">
                 <UButton variant="ghost" size="xs" icon="i-lucide-chevron-up" :disabled="i === 0" @click="moveItem(i, -1)" />
                 <UButton variant="ghost" size="xs" icon="i-lucide-chevron-down" :disabled="i === items.length - 1" @click="moveItem(i, 1)" />
-                <UButton variant="ghost" size="xs" icon="i-lucide-trash-2" color="red" @click="removeItem(item.id)" />
+                <UButton variant="ghost" size="xs" icon="i-lucide-trash-2" color="red" class="!text-red-500 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-950/20" @click="removeItem(item.id)" />
               </div>
             </div>
 
@@ -220,7 +220,7 @@ function itemHref(item: MenuItem | ChildItem) {
                 <div class="flex items-center gap-1 shrink-0">
                   <UButton variant="ghost" size="xs" icon="i-lucide-chevron-up" :disabled="ci === 0" @click="moveItem(ci, -1, item.id)" />
                   <UButton variant="ghost" size="xs" icon="i-lucide-chevron-down" :disabled="ci === item.children.length - 1" @click="moveItem(ci, 1, item.id)" />
-                  <UButton variant="ghost" size="xs" icon="i-lucide-trash-2" color="red" @click="removeItem(child.id, item.id)" />
+                  <UButton variant="ghost" size="xs" icon="i-lucide-trash-2" color="red" class="!text-red-500 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-950/20" @click="removeItem(child.id, item.id)" />
                 </div>
               </div>
             </div>
@@ -302,7 +302,7 @@ function itemHref(item: MenuItem | ChildItem) {
       <div class="space-y-4">
         <UCard>
           <template #header>
-            <span class="text-sm font-semibold">Menu settings</span>
+            <h3 class="text-base font-bold text-gray-900 dark:text-white">Menu settings</h3>
           </template>
           <div class="space-y-4">
             <UFormField label="Menu name">
@@ -321,7 +321,7 @@ function itemHref(item: MenuItem | ChildItem) {
         <!-- Live preview -->
         <UCard>
           <template #header>
-            <span class="text-sm font-semibold">Preview</span>
+            <h3 class="text-base font-bold text-gray-900 dark:text-white">Preview</h3>
           </template>
           <nav class="flex flex-col gap-1">
             <div v-if="items.length === 0" class="text-xs text-gray-400 py-2">No items</div>

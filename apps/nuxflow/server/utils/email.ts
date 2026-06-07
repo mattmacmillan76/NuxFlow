@@ -26,9 +26,14 @@ interface EmailConfig {
   smtpPort?: string
   smtpUser?: string
   smtpPass?: string
+  domain: string
 }
 
 async function loadEmailConfig(event: H3Event): Promise<EmailConfig> {
+  let host = getHeader(event, 'host')?.split(':')[0] ?? 'nuxflow.app'
+  if (host === '127.0.0.1' || host === '::1') {
+    host = 'localhost'
+  }
   return {
     emailProvider: await resolveSetting(event, 'email.provider', 'emailProvider') || 'console',
     fromAddress: await resolveSetting(event, 'email.from_address', 'emailFromAddress'),
@@ -39,11 +44,12 @@ async function loadEmailConfig(event: H3Event): Promise<EmailConfig> {
     smtpPort: await resolveSetting(event, 'email.smtp_port', 'smtpPort'),
     smtpUser: await resolveSetting(event, 'email.smtp_user', 'smtpUser'),
     smtpPass: await resolveSetting(event, 'email.smtp_pass', 'smtpPass'),
+    domain: host,
   }
 }
 
 async function sendViaResend(msg: EmailMessage, config: EmailConfig): Promise<void> {
-  const from = msg.from ?? (config.fromAddress || 'noreply@nuxflow.app')
+  const from = msg.from ?? (config.fromAddress || `noreply@${config.domain}`)
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -63,7 +69,7 @@ async function sendViaResend(msg: EmailMessage, config: EmailConfig): Promise<vo
 }
 
 async function sendViaBrevo(msg: EmailMessage, config: EmailConfig): Promise<void> {
-  const from = msg.from ?? (config.fromAddress || 'noreply@nuxflow.app')
+  const from = msg.from ?? (config.fromAddress || `noreply@${config.domain}`)
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
@@ -83,7 +89,7 @@ async function sendViaBrevo(msg: EmailMessage, config: EmailConfig): Promise<voi
 }
 
 async function sendViaZepto(msg: EmailMessage, config: EmailConfig): Promise<void> {
-  const from = msg.from ?? (config.fromAddress || 'noreply@nuxflow.app')
+  const from = msg.from ?? (config.fromAddress || `noreply@${config.domain}`)
   const res = await fetch('https://api.zeptomail.com/v1.1/email', {
     method: 'POST',
     headers: {
@@ -105,7 +111,7 @@ async function sendViaZepto(msg: EmailMessage, config: EmailConfig): Promise<voi
 async function sendViaSmtp(msg: EmailMessage, config: EmailConfig): Promise<void> {
   // SMTP sending via fetch is not possible directly; use a worker-compatible relay.
   // In Cloudflare Workers, use MailChannels (free for Workers) as the SMTP relay.
-  const from = msg.from ?? (config.fromAddress || `noreply@${config.smtpHost ?? 'nuxflow.app'}`)
+  const from = msg.from ?? (config.fromAddress || `noreply@${config.smtpHost ?? config.domain}`)
   const res = await fetch('https://api.mailchannels.net/tx/v1/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

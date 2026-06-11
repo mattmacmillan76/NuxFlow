@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1778998834724,
-      "tag": "0000_majestic_cannonball",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1747526400000,
-      "tag": "0001_allow_comments",
-      "breakpoints": false
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1780217193268,
-      "tag": "0002_romantic_hellcat",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1780552266305,
-      "tag": "0003_elite_marvel_boy",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1781022283660,
-      "tag": "0004_faithful_centennial",
+      "when": 1749638400000,
+      "tag": "0000_baseline",
       "breakpoints": true
     }
   ]

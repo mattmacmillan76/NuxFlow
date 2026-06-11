@@ -48,7 +48,7 @@ export const contentItems = sqliteTable('content_items', {
 }, (t) => [
   index('idx_content_items_site_type').on(t.siteId, t.typeId),
   index('idx_content_items_site_slug').on(t.siteId, t.slug),
-  index('idx_content_items_status').on(t.status),
+  index('idx_content_items_site_status').on(t.siteId, t.status),
   index('idx_content_items_locale').on(t.siteId, t.locale),
   index('idx_content_items_source').on(t.sourceItemId),
 ])
@@ -132,4 +132,5 @@ export const comments = sqliteTable('comments', {
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 }, (t) => [
   index('idx_comments_item').on(t.itemId),
+  index('idx_comments_site_status').on(t.siteId, t.status),
 ])

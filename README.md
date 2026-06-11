@@ -21,7 +21,7 @@
   <img src="https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm" alt="pnpm workspace" />
 </p>
 
-> **Alpha software.** NuxFlow is under active development. Breaking changes may occur between releases. It is suitable for experimentation and early adopters — not yet recommended for high-traffic production sites without thorough testing. Feedback and contributions are very welcome.
+> **Beta software.** NuxFlow is under active development. The core feature set is stable but breaking changes may still occur between releases. Suitable for early adopters and non-critical production sites — a stable `1.0` release will follow once the API surface is locked. Feedback and contributions are very welcome.
 
 ---
 
@@ -250,13 +250,13 @@ wrangler login
 wrangler d1 create nuxflow-dev
 ```
 
-Copy the returned `database_id` into `apps/nuxflow/wrangler.toml` under `[[d1_databases]]`, then apply migrations:
+Copy the returned `database_id` into `apps/nuxflow/wrangler.toml` under `[[d1_databases]]`.
 
-```bash
-cd apps/nuxflow
-wrangler d1 execute nuxflow-dev --local --file=../../packages/db/migrations/0000_confused_blackheart.sql
-wrangler d1 execute nuxflow-dev --local --file=../../packages/db/migrations/0001_plugin_signing.sql
-```
+> **Note:** Migrations are applied automatically on the first request. If you prefer to seed the local database manually before starting the dev server:
+> ```bash
+> cd apps/nuxflow
+> wrangler d1 execute nuxflow-dev --local --file=../../packages/db/migrations/0000_baseline.sql
+> ```
 
 **Option B — Local SQLite file (no Cloudflare account required)**
 
@@ -316,9 +316,9 @@ wrangler d1 create nuxflow
 wrangler kv namespace create PLUGIN_KV
 wrangler kv namespace create PLUGIN_KV --preview
 
-# Apply migrations (run from apps/nuxflow/)
-wrangler d1 execute nuxflow --remote --file=../../packages/db/migrations/0000_confused_blackheart.sql
-wrangler d1 execute nuxflow --remote --file=../../packages/db/migrations/0001_plugin_signing.sql
+# Migrations run automatically on the first request after deployment.
+# To seed manually before the first deploy:
+# wrangler d1 execute nuxflow --remote --file=../../packages/db/migrations/0000_baseline.sql
 
 # Set secrets
 wrangler secret put NUXT_BETTER_AUTH_SECRET
@@ -345,8 +345,8 @@ All variables are prefixed `NUXT_` and set in `apps/nuxflow/.env` (development) 
 
 | Variable | Required | Description |
 |---|---|---|
-| `NUXT_TURSO_URL` | ✅ | `libsql://your-db.turso.io` or `file:../../packages/db/local.db` for local dev |
-| `NUXT_TURSO_AUTH_TOKEN` | ✅* | Turso JWT token. Not needed for local `file:` URL. |
+| `NUXT_TURSO_URL` | | Turso/libSQL alternative to D1: `libsql://your-db.turso.io` or `file:../../packages/db/local.db` |
+| `NUXT_TURSO_AUTH_TOKEN` | | Turso JWT token. Not needed for local `file:` URL. |
 | `NUXT_BETTER_AUTH_SECRET` | ✅ | Session signing secret — minimum 32 characters |
 | `NUXT_PUBLIC_SITE_URL` | ✅ | Full URL including scheme, used in emails and SEO |
 | `NUXT_EMAIL_PROVIDER` | | `console` (default) · `resend` · `brevo` · `zepto` · `smtp` |

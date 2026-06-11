@@ -32,6 +32,7 @@ export const formSubmissions = sqliteTable('form_submissions', {
 }, (t) => [
   index('idx_form_submissions_form').on(t.formId),
   index('idx_form_submissions_site').on(t.siteId),
+  index('idx_form_submissions_form_status').on(t.formId, t.status),
 ])
 
 // Type definitions for form field schema

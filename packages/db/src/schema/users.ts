@@ -58,6 +58,7 @@ export const accounts = sqliteTable('accounts', {
   updatedAt: dateText('updated_at').notNull().default(sql`(datetime('now'))`),
 }, (t) => [
   index('idx_accounts_user').on(t.userId),
+  index('idx_accounts_provider').on(t.providerId, t.accountId),
 ])
 
 export const verifications = sqliteTable('verifications', {
@@ -67,7 +68,9 @@ export const verifications = sqliteTable('verifications', {
   expiresAt: dateText('expires_at').notNull(),
   createdAt: dateText('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: dateText('updated_at').notNull().default(sql`(datetime('now'))`),
-})
+}, (t) => [
+  index('idx_verifications_identifier').on(t.identifier),
+])
 
 // Per-site user roles
 export const userSiteRoles = sqliteTable('user_site_roles', {
@@ -78,6 +81,7 @@ export const userSiteRoles = sqliteTable('user_site_roles', {
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 }, (t) => [
   index('idx_user_site_roles_user_site').on(t.userId, t.siteId),
+  index('idx_user_site_roles_site').on(t.siteId),
 ])
 
 export const apiKeys = sqliteTable('api_keys', {

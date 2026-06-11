@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "565eb542-e3ad-48f8-8c72-bc851e366ec9",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "b4c74c1c-ab9b-48fa-8a78-e184413b365b",
+  "prevId": "464e34f5-8991-47b7-a82d-b4c432692307",
   "tables": {
     "site_settings": {
       "name": "site_settings",
@@ -226,6 +226,27 @@
           "notNull": false,
           "autoincrement": false
         },
+        "access_token_expires_at": {
+          "name": "access_token_expires_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "refresh_token_expires_at": {
+          "name": "refresh_token_expires_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "password": {
           "name": "password",
           "type": "text",
@@ -255,6 +276,14 @@
           "name": "idx_accounts_user",
           "columns": [
             "user_id"
+          ],
+          "isUnique": false
+        },
+        "idx_accounts_provider": {
+          "name": "idx_accounts_provider",
+          "columns": [
+            "provider_id",
+            "account_id"
           ],
           "isUnique": false
         }
@@ -380,6 +409,116 @@
         "api_keys_user_id_users_id_fk": {
           "name": "api_keys_user_id_users_id_fk",
           "tableFrom": "api_keys",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "passkey": {
+      "name": "passkey",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "public_key": {
+          "name": "public_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "credential_id": {
+          "name": "credential_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "counter": {
+          "name": "counter",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "device_type": {
+          "name": "device_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "backed_up": {
+          "name": "backed_up",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "transports": {
+          "name": "transports",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "aaguid": {
+          "name": "aaguid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(datetime('now'))"
+        }
+      },
+      "indexes": {
+        "idx_passkeys_user": {
+          "name": "idx_passkeys_user",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "passkey_user_id_users_id_fk": {
+          "name": "passkey_user_id_users_id_fk",
+          "tableFrom": "passkey",
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
@@ -541,6 +680,13 @@
             "site_id"
           ],
           "isUnique": false
+        },
+        "idx_user_site_roles_site": {
+          "name": "idx_user_site_roles_site",
+          "columns": [
+            "site_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -693,7 +839,15 @@
           "default": "(datetime('now'))"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_verifications_identifier": {
+          "name": "idx_verifications_identifier",
+          "columns": [
+            "identifier"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -780,6 +934,14 @@
           "name": "idx_comments_item",
           "columns": [
             "item_id"
+          ],
+          "isUnique": false
+        },
+        "idx_comments_site_status": {
+          "name": "idx_comments_site_status",
+          "columns": [
+            "site_id",
+            "status"
           ],
           "isUnique": false
         }
@@ -967,6 +1129,28 @@
           "notNull": false,
           "autoincrement": false
         },
+        "allow_comments": {
+          "name": "allow_comments",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "locale": {
+          "name": "locale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'en'"
+        },
+        "source_item_id": {
+          "name": "source_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -1001,10 +1185,26 @@
           ],
           "isUnique": false
         },
-        "idx_content_items_status": {
-          "name": "idx_content_items_status",
+        "idx_content_items_site_status": {
+          "name": "idx_content_items_site_status",
           "columns": [
+            "site_id",
             "status"
+          ],
+          "isUnique": false
+        },
+        "idx_content_items_locale": {
+          "name": "idx_content_items_locale",
+          "columns": [
+            "site_id",
+            "locale"
+          ],
+          "isUnique": false
+        },
+        "idx_content_items_source": {
+          "name": "idx_content_items_source",
+          "columns": [
+            "source_item_id"
           ],
           "isUnique": false
         }
@@ -1042,6 +1242,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "content_items_source_item_id_content_items_id_fk": {
+          "name": "content_items_source_item_id_content_items_id_fk",
+          "tableFrom": "content_items",
+          "tableTo": "content_items",
+          "columnsFrom": [
+            "source_item_id"
           ],
           "columnsTo": [
             "id"
@@ -1775,10 +1988,11 @@
         }
       },
       "indexes": {
-        "idx_media_site": {
-          "name": "idx_media_site",
+        "idx_media_site_folder": {
+          "name": "idx_media_site_folder",
           "columns": [
-            "site_id"
+            "site_id",
+            "folder_id"
           ],
           "isUnique": false
         },
@@ -1971,6 +2185,14 @@
           "name": "idx_form_submissions_site",
           "columns": [
             "site_id"
+          ],
+          "isUnique": false
+        },
+        "idx_form_submissions_form_status": {
+          "name": "idx_form_submissions_form_status",
+          "columns": [
+            "form_id",
+            "status"
           ],
           "isUnique": false
         }
@@ -2230,6 +2452,14 @@
           "columns": [
             "resource",
             "resource_id"
+          ],
+          "isUnique": false
+        },
+        "idx_audit_logs_site_user": {
+          "name": "idx_audit_logs_site_user",
+          "columns": [
+            "site_id",
+            "user_id"
           ],
           "isUnique": false
         }
@@ -2990,6 +3220,14 @@
           "columns": [
             "provider",
             "provider_subscription_id"
+          ],
+          "isUnique": false
+        },
+        "idx_subscriptions_site_status": {
+          "name": "idx_subscriptions_site_status",
+          "columns": [
+            "site_id",
+            "status"
           ],
           "isUnique": false
         }

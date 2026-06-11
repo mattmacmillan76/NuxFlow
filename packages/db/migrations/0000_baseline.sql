@@ -1,14 +1,4 @@
 PRAGMA foreign_keys = OFF;--> statement-breakpoint
-CREATE TABLE `site_settings` (
-	`id` text PRIMARY KEY NOT NULL,
-	`site_id` text NOT NULL,
-	`key` text NOT NULL,
-	`value` text,
-	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
-	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `idx_site_settings_site_key` ON `site_settings` (`site_id`,`key`);--> statement-breakpoint
 CREATE TABLE `sites` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
@@ -23,6 +13,41 @@ CREATE TABLE `sites` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `sites_domain_unique` ON `sites` (`domain`);--> statement-breakpoint
+CREATE TABLE `site_settings` (
+	`id` text PRIMARY KEY NOT NULL,
+	`site_id` text NOT NULL,
+	`key` text NOT NULL,
+	`value` text,
+	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
+	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_site_settings_site_key` ON `site_settings` (`site_id`,`key`);--> statement-breakpoint
+CREATE TABLE `users` (
+	`id` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`email` text NOT NULL,
+	`email_verified` integer DEFAULT false NOT NULL,
+	`image` text,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	`updated_at` text DEFAULT (datetime('now')) NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);--> statement-breakpoint
+CREATE TABLE `sessions` (
+	`id` text PRIMARY KEY NOT NULL,
+	`token` text NOT NULL,
+	`expires_at` text NOT NULL,
+	`ip_address` text,
+	`user_agent` text,
+	`user_id` text NOT NULL,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `sessions_token_unique` ON `sessions` (`token`);--> statement-breakpoint
+CREATE INDEX `idx_sessions_user` ON `sessions` (`user_id`);--> statement-breakpoint
 CREATE TABLE `accounts` (
 	`id` text PRIMARY KEY NOT NULL,
 	`account_id` text NOT NULL,
@@ -32,6 +57,9 @@ CREATE TABLE `accounts` (
 	`refresh_token` text,
 	`id_token` text,
 	`expires_at` text,
+	`access_token_expires_at` text,
+	`refresh_token_expires_at` text,
+	`scope` text,
 	`password` text,
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
 	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
@@ -39,6 +67,29 @@ CREATE TABLE `accounts` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_accounts_user` ON `accounts` (`user_id`);--> statement-breakpoint
+CREATE INDEX `idx_accounts_provider` ON `accounts` (`provider_id`,`account_id`);--> statement-breakpoint
+CREATE TABLE `verifications` (
+	`id` text PRIMARY KEY NOT NULL,
+	`identifier` text NOT NULL,
+	`value` text NOT NULL,
+	`expires_at` text NOT NULL,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	`updated_at` text DEFAULT (datetime('now')) NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `idx_verifications_identifier` ON `verifications` (`identifier`);--> statement-breakpoint
+CREATE TABLE `user_site_roles` (
+	`id` text PRIMARY KEY NOT NULL,
+	`user_id` text NOT NULL,
+	`site_id` text NOT NULL,
+	`role` text DEFAULT 'viewer' NOT NULL,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_user_site_roles_user_site` ON `user_site_roles` (`user_id`,`site_id`);--> statement-breakpoint
+CREATE INDEX `idx_user_site_roles_site` ON `user_site_roles` (`site_id`);--> statement-breakpoint
 CREATE TABLE `api_keys` (
 	`id` text PRIMARY KEY NOT NULL,
 	`site_id` text NOT NULL,
@@ -55,68 +106,38 @@ CREATE TABLE `api_keys` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX `api_keys_key_hash_unique` ON `api_keys` (`key_hash`);--> statement-breakpoint
 CREATE INDEX `idx_api_keys_site` ON `api_keys` (`site_id`);--> statement-breakpoint
-CREATE TABLE `sessions` (
+CREATE TABLE `passkey` (
 	`id` text PRIMARY KEY NOT NULL,
-	`token` text NOT NULL,
-	`expires_at` text NOT NULL,
-	`ip_address` text,
-	`user_agent` text,
+	`name` text,
+	`public_key` text NOT NULL,
 	`user_id` text NOT NULL,
+	`credential_id` text NOT NULL,
+	`counter` integer NOT NULL,
+	`device_type` text NOT NULL,
+	`backed_up` integer NOT NULL,
+	`transports` text,
+	`aaguid` text,
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
-	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `sessions_token_unique` ON `sessions` (`token`);--> statement-breakpoint
-CREATE INDEX `idx_sessions_user` ON `sessions` (`user_id`);--> statement-breakpoint
-CREATE TABLE `user_site_roles` (
+CREATE INDEX `idx_passkeys_user` ON `passkey` (`user_id`);--> statement-breakpoint
+CREATE TABLE `content_types` (
 	`id` text PRIMARY KEY NOT NULL,
-	`user_id` text NOT NULL,
 	`site_id` text NOT NULL,
-	`role` text DEFAULT 'viewer' NOT NULL,
+	`slug` text NOT NULL,
+	`name` text NOT NULL,
+	`singular_name` text NOT NULL,
+	`icon` text,
+	`is_built_in` integer DEFAULT false NOT NULL,
+	`has_revisions` integer DEFAULT true NOT NULL,
+	`has_comments` integer DEFAULT false NOT NULL,
+	`schema` text,
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
-	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `idx_user_site_roles_user_site` ON `user_site_roles` (`user_id`,`site_id`);--> statement-breakpoint
-CREATE TABLE `users` (
-	`id` text PRIMARY KEY NOT NULL,
-	`name` text NOT NULL,
-	`email` text NOT NULL,
-	`email_verified` integer DEFAULT false NOT NULL,
-	`image` text,
-	`created_at` text DEFAULT (datetime('now')) NOT NULL,
-	`updated_at` text DEFAULT (datetime('now')) NOT NULL
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);--> statement-breakpoint
-CREATE TABLE `verifications` (
-	`id` text PRIMARY KEY NOT NULL,
-	`identifier` text NOT NULL,
-	`value` text NOT NULL,
-	`expires_at` text NOT NULL,
-	`created_at` text DEFAULT (datetime('now')) NOT NULL,
-	`updated_at` text DEFAULT (datetime('now')) NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE `comments` (
-	`id` text PRIMARY KEY NOT NULL,
-	`site_id` text NOT NULL,
-	`item_id` text NOT NULL,
-	`author_id` text,
-	`parent_id` text,
-	`guest_name` text,
-	`guest_email` text,
-	`body` text NOT NULL,
-	`status` text DEFAULT 'pending' NOT NULL,
-	`created_at` text DEFAULT (datetime('now')) NOT NULL,
-	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`item_id`) REFERENCES `content_items`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
-);
---> statement-breakpoint
-CREATE INDEX `idx_comments_item` ON `comments` (`item_id`);--> statement-breakpoint
+CREATE INDEX `idx_content_types_site_slug` ON `content_types` (`site_id`,`slug`);--> statement-breakpoint
 CREATE TABLE `content_items` (
 	`id` text PRIMARY KEY NOT NULL,
 	`site_id` text NOT NULL,
@@ -137,6 +158,9 @@ CREATE TABLE `content_items` (
 	`preview_token` text,
 	`preview_token_expires_at` text,
 	`settings` text,
+	`allow_comments` integer,
+	`locale` text DEFAULT 'en' NOT NULL,
+	`source_item_id` text REFERENCES `content_items`(`id`) ON UPDATE no action ON DELETE set null,
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
 	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
 	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade,
@@ -146,7 +170,9 @@ CREATE TABLE `content_items` (
 --> statement-breakpoint
 CREATE INDEX `idx_content_items_site_type` ON `content_items` (`site_id`,`type_id`);--> statement-breakpoint
 CREATE INDEX `idx_content_items_site_slug` ON `content_items` (`site_id`,`slug`);--> statement-breakpoint
-CREATE INDEX `idx_content_items_status` ON `content_items` (`status`);--> statement-breakpoint
+CREATE INDEX `idx_content_items_site_status` ON `content_items` (`site_id`,`status`);--> statement-breakpoint
+CREATE INDEX `idx_content_items_locale` ON `content_items` (`site_id`,`locale`);--> statement-breakpoint
+CREATE INDEX `idx_content_items_source` ON `content_items` (`source_item_id`);--> statement-breakpoint
 CREATE TABLE `content_revisions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`item_id` text NOT NULL,
@@ -160,54 +186,6 @@ CREATE TABLE `content_revisions` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_content_revisions_item` ON `content_revisions` (`item_id`);--> statement-breakpoint
-CREATE TABLE `content_taxonomy_terms` (
-	`content_item_id` text NOT NULL,
-	`term_id` text NOT NULL,
-	FOREIGN KEY (`content_item_id`) REFERENCES `content_items`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`term_id`) REFERENCES `taxonomy_terms`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `idx_ctt_item` ON `content_taxonomy_terms` (`content_item_id`);--> statement-breakpoint
-CREATE INDEX `idx_ctt_term` ON `content_taxonomy_terms` (`term_id`);--> statement-breakpoint
-CREATE TABLE `content_types` (
-	`id` text PRIMARY KEY NOT NULL,
-	`site_id` text NOT NULL,
-	`slug` text NOT NULL,
-	`name` text NOT NULL,
-	`singular_name` text NOT NULL,
-	`icon` text,
-	`is_built_in` integer DEFAULT false NOT NULL,
-	`has_revisions` integer DEFAULT true NOT NULL,
-	`has_comments` integer DEFAULT false NOT NULL,
-	`schema` text,
-	`created_at` text DEFAULT (datetime('now')) NOT NULL,
-	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `idx_content_types_site_slug` ON `content_types` (`site_id`,`slug`);--> statement-breakpoint
-CREATE TABLE `menus` (
-	`id` text PRIMARY KEY NOT NULL,
-	`site_id` text NOT NULL,
-	`name` text NOT NULL,
-	`location` text,
-	`items` text DEFAULT '[]' NOT NULL,
-	`created_at` text DEFAULT (datetime('now')) NOT NULL,
-	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
-	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `idx_menus_site` ON `menus` (`site_id`);--> statement-breakpoint
-CREATE TABLE `redirects` (
-	`id` text PRIMARY KEY NOT NULL,
-	`site_id` text NOT NULL,
-	`from` text NOT NULL,
-	`to` text NOT NULL,
-	`status_code` integer DEFAULT 301 NOT NULL,
-	`created_at` text DEFAULT (datetime('now')) NOT NULL,
-	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `idx_redirects_site_from` ON `redirects` (`site_id`,`from`);--> statement-breakpoint
 CREATE TABLE `taxonomies` (
 	`id` text PRIMARY KEY NOT NULL,
 	`site_id` text NOT NULL,
@@ -231,6 +209,56 @@ CREATE TABLE `taxonomy_terms` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_taxonomy_terms_taxonomy` ON `taxonomy_terms` (`taxonomy_id`);--> statement-breakpoint
+CREATE TABLE `content_taxonomy_terms` (
+	`content_item_id` text NOT NULL,
+	`term_id` text NOT NULL,
+	FOREIGN KEY (`content_item_id`) REFERENCES `content_items`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`term_id`) REFERENCES `taxonomy_terms`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_ctt_item` ON `content_taxonomy_terms` (`content_item_id`);--> statement-breakpoint
+CREATE INDEX `idx_ctt_term` ON `content_taxonomy_terms` (`term_id`);--> statement-breakpoint
+CREATE TABLE `menus` (
+	`id` text PRIMARY KEY NOT NULL,
+	`site_id` text NOT NULL,
+	`name` text NOT NULL,
+	`location` text,
+	`items` text DEFAULT '[]' NOT NULL,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
+	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_menus_site` ON `menus` (`site_id`);--> statement-breakpoint
+CREATE TABLE `redirects` (
+	`id` text PRIMARY KEY NOT NULL,
+	`site_id` text NOT NULL,
+	`from` text NOT NULL,
+	`to` text NOT NULL,
+	`status_code` integer DEFAULT 301 NOT NULL,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_redirects_site_from` ON `redirects` (`site_id`,`from`);--> statement-breakpoint
+CREATE TABLE `comments` (
+	`id` text PRIMARY KEY NOT NULL,
+	`site_id` text NOT NULL,
+	`item_id` text NOT NULL,
+	`author_id` text,
+	`parent_id` text,
+	`guest_name` text,
+	`guest_email` text,
+	`body` text NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`item_id`) REFERENCES `content_items`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`author_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
+);
+--> statement-breakpoint
+CREATE INDEX `idx_comments_item` ON `comments` (`item_id`);--> statement-breakpoint
+CREATE INDEX `idx_comments_site_status` ON `comments` (`site_id`,`status`);--> statement-breakpoint
 CREATE TABLE `media` (
 	`id` text PRIMARY KEY NOT NULL,
 	`site_id` text NOT NULL,
@@ -253,7 +281,7 @@ CREATE TABLE `media` (
 	FOREIGN KEY (`uploaded_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-CREATE INDEX `idx_media_site` ON `media` (`site_id`);--> statement-breakpoint
+CREATE INDEX `idx_media_site_folder` ON `media` (`site_id`,`folder_id`);--> statement-breakpoint
 CREATE INDEX `idx_media_folder` ON `media` (`folder_id`);--> statement-breakpoint
 CREATE TABLE `media_folders` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -265,6 +293,22 @@ CREATE TABLE `media_folders` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_media_folders_site` ON `media_folders` (`site_id`);--> statement-breakpoint
+CREATE TABLE `forms` (
+	`id` text PRIMARY KEY NOT NULL,
+	`site_id` text NOT NULL,
+	`name` text NOT NULL,
+	`slug` text NOT NULL,
+	`fields` text DEFAULT '[]' NOT NULL,
+	`logic` text DEFAULT '[]' NOT NULL,
+	`notifications` text,
+	`redirect_url` text,
+	`status` text DEFAULT 'active' NOT NULL,
+	`created_at` text DEFAULT (datetime('now')) NOT NULL,
+	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
+	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `idx_forms_site_slug` ON `forms` (`site_id`,`slug`);--> statement-breakpoint
 CREATE TABLE `form_submissions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`form_id` text NOT NULL,
@@ -282,22 +326,7 @@ CREATE TABLE `form_submissions` (
 --> statement-breakpoint
 CREATE INDEX `idx_form_submissions_form` ON `form_submissions` (`form_id`);--> statement-breakpoint
 CREATE INDEX `idx_form_submissions_site` ON `form_submissions` (`site_id`);--> statement-breakpoint
-CREATE TABLE `forms` (
-	`id` text PRIMARY KEY NOT NULL,
-	`site_id` text NOT NULL,
-	`name` text NOT NULL,
-	`slug` text NOT NULL,
-	`fields` text DEFAULT '[]' NOT NULL,
-	`logic` text DEFAULT '[]' NOT NULL,
-	`notifications` text,
-	`redirect_url` text,
-	`status` text DEFAULT 'active' NOT NULL,
-	`created_at` text DEFAULT (datetime('now')) NOT NULL,
-	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
-	FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `idx_forms_site_slug` ON `forms` (`site_id`,`slug`);--> statement-breakpoint
+CREATE INDEX `idx_form_submissions_form_status` ON `form_submissions` (`form_id`,`status`);--> statement-breakpoint
 CREATE TABLE `audit_logs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`site_id` text NOT NULL,
@@ -316,6 +345,7 @@ CREATE TABLE `audit_logs` (
 --> statement-breakpoint
 CREATE INDEX `idx_audit_logs_site` ON `audit_logs` (`site_id`);--> statement-breakpoint
 CREATE INDEX `idx_audit_logs_resource` ON `audit_logs` (`resource`,`resource_id`);--> statement-breakpoint
+CREATE INDEX `idx_audit_logs_site_user` ON `audit_logs` (`site_id`,`user_id`);--> statement-breakpoint
 CREATE TABLE `dynamic_plugins` (
 	`id` text PRIMARY KEY NOT NULL,
 	`site_id` text NOT NULL,
@@ -423,4 +453,5 @@ CREATE TABLE `subscriptions` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_subscriptions_site_user` ON `subscriptions` (`site_id`,`user_id`);--> statement-breakpoint
-CREATE INDEX `idx_subscriptions_provider_id` ON `subscriptions` (`provider`,`provider_subscription_id`);
+CREATE INDEX `idx_subscriptions_provider_id` ON `subscriptions` (`provider`,`provider_subscription_id`);--> statement-breakpoint
+CREATE INDEX `idx_subscriptions_site_status` ON `subscriptions` (`site_id`,`status`);

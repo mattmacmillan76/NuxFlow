@@ -32,6 +32,7 @@ export const auditLogs = sqliteTable('audit_logs', {
 }, (t) => [
   index('idx_audit_logs_site').on(t.siteId),
   index('idx_audit_logs_resource').on(t.resource, t.resourceId),
+  index('idx_audit_logs_site_user').on(t.siteId, t.userId),
 ])
 
 export const notifications = sqliteTable('notifications', {

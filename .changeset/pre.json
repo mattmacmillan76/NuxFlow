@@ -1,0 +1,24 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "@nuxflow/app": "1.0.0",
+    "@nuxflow/cli": "1.0.0",
+    "@nuxflow/db": "1.0.0",
+    "@nuxflow/plugin-sdk": "1.0.0",
+    "@nuxflow/plugin-canvas": "1.0.0",
+    "@nuxflow/plugin-contact-form": "1.0.0",
+    "@nuxflow/plugin-html-block": "1.0.0",
+    "@nuxflow/plugin-payments": "1.0.0",
+    "@nuxflow/theme-default": "0.1.0"
+  },
+  "changesets": [
+    "canvas-admin-ui-simplification",
+    "feat-ai-suite",
+    "feat-membership-auth-pages-and-test-suite",
+    "feat-social-login-and-security",
+    "fix-lint-and-kysely",
+    "fix-ssr-setup-onboarding",
+    "security-enhancements-and-new-canvas-blocks"
+  ]
+}

@@ -41,4 +41,5 @@ export const subscriptions = sqliteTable('subscriptions', {
 }, (t) => [
   index('idx_subscriptions_site_user').on(t.siteId, t.userId),
   index('idx_subscriptions_provider_id').on(t.provider, t.providerSubscriptionId),
+  index('idx_subscriptions_site_status').on(t.siteId, t.status),
 ])

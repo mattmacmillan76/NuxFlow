@@ -22,7 +22,7 @@ export const media = sqliteTable('media', {
   metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>(),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 }, (t) => [
-  index('idx_media_site').on(t.siteId),
+  index('idx_media_site_folder').on(t.siteId, t.folderId),
   index('idx_media_folder').on(t.folderId),
 ])
 

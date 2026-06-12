@@ -7,6 +7,8 @@ import { useDb } from '../../../utils/db'
 import { verifyTurnstile } from '../../../utils/turnstile'
 import { rateLimit } from '../../../utils/rate-limit'
 import { sendEmail, escapeHtml } from '../../../utils/email'
+import { resolveSetting } from '../../../utils/settings'
+import { sendPushToUser } from '../../../utils/webpush'
 
 const CONTACT_SLUG = 'contact'
 
@@ -49,6 +51,7 @@ export default defineEventHandler(async (event) => {
   await rateLimit(event, { limit: 5, windowMs: 60_000, keyPrefix: 'contact-submit' })
 
   const siteId = event.context.siteId as string
+  const submitterUserId = (event.context.user as { id?: string } | undefined)?.id ?? null
   const body = await readValidatedBody(event, bodySchema.parse)
 
   const ip = getHeader(event, 'cf-connecting-ip') ?? getHeader(event, 'x-forwarded-for') ?? undefined
@@ -112,6 +115,17 @@ export default defineEventHandler(async (event) => {
     console.error('Failed to send contact notification email:', err)
     const msg = err instanceof Error ? err.message : String(err)
     throw createError({ statusCode: 422, message: `Message saved, but failed to send email notification: ${msg}` })
+  }
+
+  // Push confirmation to the logged-in member who submitted
+  if (submitterUserId) {
+    const pushEnabled = await resolveSetting(event, 'push.events.form_submission')
+    if (pushEnabled === 'true') {
+      sendPushToUser(event, submitterUserId, {
+        title: 'Message received',
+        body: 'Thanks for your message. We\'ll be in touch soon.',
+      }).catch(err => console.error('[push] Form submission push failed:', err))
+    }
   }
 
   setResponseStatus(event, 201)

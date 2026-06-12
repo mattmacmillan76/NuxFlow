@@ -24,6 +24,7 @@ export const SENSITIVE_SETTING_KEYS = new Set([
   'ai.anthropic_api_key',
   'ai.gemini_api_key',
   'ai.deepseek_api_key',
+  'push.vapid_private_key',
 ])
 
 export const SECRET_MASK = '••••••••••••••••'

@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { useDb } from '../../../utils/db'
 import { requireRole } from '../../../utils/permissions'
 import { writeAuditLog } from '../../../utils/audit'
+import { resolveSetting } from '../../../utils/settings'
+import { broadcastPushToSite } from '../../../utils/webpush'
 import { contentItems, contentRevisions } from '@nuxflow/db/schema'
 import { and, eq, sql } from 'drizzle-orm'
 import { ulid } from 'ulid'
@@ -56,6 +58,19 @@ export default defineEventHandler(async (event) => {
     before: existing,
     after: body,
   })
+
+  // Push broadcast when content is first published
+  const isFirstPublish = body.status === 'published' && existing.status !== 'published'
+  if (isFirstPublish) {
+    const enabled = await resolveSetting(event, 'push.events.content_published')
+    if (enabled === 'true') {
+      broadcastPushToSite(event, {
+        title: body.title ?? existing.title,
+        body: 'New content has been published.',
+        url: `/${body.slug ?? existing.slug}`,
+      }).catch(err => console.error('[push] Content publish broadcast failed:', err))
+    }
+  }
 
   return { id }
 })

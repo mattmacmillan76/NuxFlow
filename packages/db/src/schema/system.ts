@@ -91,6 +91,19 @@ export const dynamicPlugins = sqliteTable('dynamic_plugins', {
   index('idx_dynamic_plugins_site').on(t.siteId),
 ])
 
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+  id: text('id').primaryKey(),
+  siteId: text('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  endpoint: text('endpoint').notNull(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+}, (t) => [
+  index('idx_push_subs_site').on(t.siteId),
+  index('idx_push_subs_user_site').on(t.userId, t.siteId),
+])
+
 // Virtual FTS5 table — created via raw SQL in migration, not via Drizzle
 // See migrations/0001_fts5_search_index.sql
 export const searchIndexSql = `

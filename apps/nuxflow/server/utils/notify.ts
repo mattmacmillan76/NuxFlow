@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3'
 import { useDb } from './db'
 import { sendEmail } from './email'
+import { sendPushToUser } from './webpush'
 import { notifications, users } from '@nuxflow/db/schema'
 import { eq } from 'drizzle-orm'
 import { ulid } from 'ulid'
@@ -12,8 +13,10 @@ interface NotifyOptions {
   title: string
   body: string
   data?: Record<string, unknown>
-  // If true, also send an email to the user
+  /** Also send an email to the user. */
   sendEmailNotification?: boolean
+  /** Also send a browser push notification (requires VAPID keys configured). */
+  sendPush?: boolean
 }
 
 export async function sendNotification(opts: NotifyOptions, event: H3Event) {
@@ -43,5 +46,13 @@ export async function sendNotification(opts: NotifyOptions, event: H3Event) {
         text: opts.body,
       }).catch(err => console.error('[notify] Email delivery failed:', err))
     }
+  }
+
+  if (opts.sendPush) {
+    await sendPushToUser(event, opts.userId, {
+      title: opts.title,
+      body: opts.body,
+      data: opts.data,
+    }).catch(err => console.error('[notify] Push delivery failed:', err))
   }
 }

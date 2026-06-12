@@ -5,6 +5,18 @@ import { ulid } from 'ulid'
 import { StripeProvider } from '@nuxflow/plugin-payments/providers/stripe'
 import { LemonSqueezyProvider } from '@nuxflow/plugin-payments/providers/lemonsqueezy'
 import { PaddleProvider } from '@nuxflow/plugin-payments/providers/paddle'
+import { resolveSetting } from '../../../../utils/settings'
+import { sendPushToUser } from '../../../../utils/webpush'
+
+async function maybeSendPaymentPush(event: H3Event, userId: string, tierName: string | undefined) {
+  const enabled = await resolveSetting(event, 'push.events.payment_confirmation')
+  if (enabled !== 'true') return
+  sendPushToUser(event, userId, {
+    title: 'Subscription confirmed',
+    body: tierName ? `You're now subscribed to ${tierName}.` : 'Your subscription is now active.',
+    url: '/account',
+  }).catch(err => console.error('[push] Payment push failed:', err))
+}
 
 // ── Stripe ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +71,9 @@ async function handleStripeWebhook(event: H3Event, rawBody: string) {
           providerCustomerId: String(sub.customer),
           status, currentPeriodStart: periodStart, currentPeriodEnd: periodEnd,
         })
+        if (status === 'active' || status === 'trialing') {
+          await maybeSendPaymentPush(event, userId, tier?.name)
+        }
       }
       break
     }
@@ -117,6 +132,9 @@ async function handleLemonSqueezyWebhook(event: H3Event, rawBody: string) {
         providerCustomerId: String(sub.attributes.customer_id),
         status, currentPeriodEnd: sub.attributes.renews_at ?? undefined,
       })
+      if (eventName === 'subscription_created' && (status === 'active' || status === 'trialing')) {
+        await maybeSendPaymentPush(event, userId, tier?.name)
+      }
     }
   } else if (['subscription_cancelled', 'subscription_expired'].includes(eventName)) {
     await db.update(subscriptions)
@@ -179,6 +197,9 @@ async function handlePaddleWebhook(event: H3Event, rawBody: string) {
         providerCustomerId: sub.customer_id,
         status, currentPeriodStart: sub.current_billing_period?.starts_at, currentPeriodEnd: sub.current_billing_period?.ends_at,
       })
+      if (payload.event_type === 'subscription.activated' && (status === 'active' || status === 'trialing')) {
+        await maybeSendPaymentPush(event, userId, tier?.name)
+      }
     }
   } else if (payload.event_type === 'subscription.canceled') {
     await db.update(subscriptions)

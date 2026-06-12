@@ -1,6 +1,25 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'default', middleware: ['auth'] })
 
+const { isSupported, isSubscribed, isLoading, subscribe, unsubscribe, refreshStatus } = usePushNotifications()
+const vapidConfigured = ref(false)
+
+onMounted(async () => {
+  try {
+    const { publicKey } = await $fetch<{ publicKey: string | null }>('/api/v1/push/vapid-public-key')
+    vapidConfigured.value = !!publicKey
+  } catch { /* ignore */ }
+  await refreshStatus()
+})
+
+async function togglePush() {
+  if (isSubscribed.value) {
+    await unsubscribe()
+  } else {
+    await subscribe()
+  }
+}
+
 interface Tier {
   id: string
   name: string
@@ -172,6 +191,31 @@ function formatDate(dateStr: string | null) {
         <UButton to="/pricing" icon="i-lucide-star">View plans</UButton>
       </div>
     </UCard>
+
+    <!-- Notifications -->
+    <ClientOnly>
+      <UCard v-if="vapidConfigured">
+        <template #header>
+          <p class="text-sm font-semibold text-gray-900 dark:text-white">Notifications</p>
+        </template>
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-sm font-medium text-gray-900 dark:text-white">Browser push notifications</p>
+            <p class="text-xs text-gray-400 mt-0.5">
+              <template v-if="!isSupported">Not supported in this browser.</template>
+              <template v-else-if="isSubscribed">You'll receive notifications even when not on this site.</template>
+              <template v-else>Get notified about new content and updates.</template>
+            </p>
+          </div>
+          <USwitch
+            :model-value="isSubscribed"
+            :disabled="!isSupported || isLoading"
+            :loading="isLoading"
+            @update:model-value="togglePush"
+          />
+        </div>
+      </UCard>
+    </ClientOnly>
 
     <!-- Security -->
     <UCard>

@@ -16,6 +16,7 @@ const tabs = [
   { label: 'Email', icon: 'i-lucide-mail' },
   { label: 'Integrations', icon: 'i-lucide-plug' },
   { label: 'AI Settings', icon: 'i-lucide-bot' },
+  { label: 'Push', icon: 'i-lucide-bell' },
   { label: 'Security', icon: 'i-lucide-shield-check' },
   { label: 'Danger zone', icon: 'i-lucide-triangle-alert' },
 ]
@@ -159,6 +160,76 @@ const aiProviderOptions = [
   { label: 'Local (Ollama)', value: 'ollama' },
 ]
 
+// ── Push notifications ────────────────────────────────────────────────────────
+const push = reactive({
+  vapidPublicKey: '' as string | null,
+  eventsContentPublished: false,
+  eventsPaymentConfirmation: true,
+  eventsFormSubmission: true,
+})
+const pushSubscriberCount = ref(0)
+const generatingVapid = ref(false)
+const sendingTestPush = ref(false)
+const broadcasting = ref(false)
+const broadcastTitle = ref('')
+const broadcastBody = ref('')
+const broadcastUrl = ref('')
+
+async function generateVapidKeys() {
+  generatingVapid.value = true
+  try {
+    const { publicKey } = await $fetch<{ publicKey: string }>('/api/v1/push/vapid-keys', { method: 'POST' })
+    push.vapidPublicKey = publicKey
+    toast.add({ title: 'VAPID keys generated', color: 'green' })
+  } catch {
+    toast.add({ title: 'Failed to generate VAPID keys', color: 'red' })
+  } finally {
+    generatingVapid.value = false
+  }
+}
+
+async function sendTestPush() {
+  sendingTestPush.value = true
+  try {
+    await $fetch('/api/v1/push/test', { method: 'POST' })
+    toast.add({ title: 'Test notification sent', color: 'green' })
+  } catch {
+    toast.add({ title: 'Failed — make sure you have subscribed to push notifications', color: 'red' })
+  } finally {
+    sendingTestPush.value = false
+  }
+}
+
+async function sendBroadcast() {
+  if (!broadcastTitle.value || !broadcastBody.value) return
+  broadcasting.value = true
+  try {
+    await $fetch('/api/v1/push/broadcast', {
+      method: 'POST',
+      body: {
+        title: broadcastTitle.value,
+        body: broadcastBody.value,
+        url: broadcastUrl.value || undefined,
+      },
+    })
+    broadcastTitle.value = ''
+    broadcastBody.value = ''
+    broadcastUrl.value = ''
+    toast.add({ title: 'Notification broadcast sent', color: 'green' })
+  } catch {
+    toast.add({ title: 'Broadcast failed', color: 'red' })
+  } finally {
+    broadcasting.value = false
+  }
+}
+
+async function fetchPushSubscriberCount() {
+  try {
+    const { count } = await $fetch<{ count: number }>('/api/v1/push/subscribers')
+    pushSubscriberCount.value = count
+  } catch { /* ignore */ }
+}
+
 // ── Populate from API ─────────────────────────────────────────────────────────
 watch(data, (d) => {
   if (!d) return
@@ -195,7 +266,14 @@ watch(data, (d) => {
   ai.deepseekApiKey = (s['ai.deepseek_api_key'] as string) ?? ''
   ai.ollamaBaseUrl = (s['ai.ollama_base_url'] as string) ?? 'http://localhost:11434'
   ai.ollamaModel = (s['ai.ollama_model'] as string) ?? 'llama3'
+
+  push.vapidPublicKey = (s['push.vapid_public_key'] as string) || null
+  push.eventsContentPublished = s['push.events.content_published'] === 'true'
+  push.eventsPaymentConfirmation = s['push.events.payment_confirmation'] !== 'false'
+  push.eventsFormSubmission = s['push.events.form_submission'] !== 'false'
 }, { immediate: true })
+
+onMounted(() => fetchPushSubscriberCount())
 
 async function save() {
   saving.value = true
@@ -217,6 +295,9 @@ async function save() {
       'appearance.favicon_url': appearance.faviconUrl || null,
       'notificationEmail': general.notificationEmail || null,
       'auth.allow_public_registration': general.allowPublicRegistration ? 'true' : 'false',
+      'push.events.content_published': push.eventsContentPublished ? 'true' : 'false',
+      'push.events.payment_confirmation': push.eventsPaymentConfirmation ? 'true' : 'false',
+      'push.events.form_submission': push.eventsFormSubmission ? 'true' : 'false',
     }
     await $fetch('/api/v1/settings', {
       method: 'PATCH',
@@ -638,6 +719,137 @@ async function deleteSite() {
               </div>
             </template>
           </UCard>
+        </template>
+
+        <!-- Push notifications -->
+        <template v-if="active === 'Push'">
+
+          <!-- VAPID keys -->
+          <UCard>
+            <template #header>
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-semibold text-gray-900 dark:text-white">VAPID keys</p>
+                <UBadge v-if="push.vapidPublicKey" color="green" variant="soft">Configured</UBadge>
+                <UBadge v-else color="gray" variant="soft">Not configured</UBadge>
+              </div>
+            </template>
+            <div class="space-y-4">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                VAPID keys authenticate your server with browser push services. Generate once and leave them — regenerating invalidates all existing subscriber subscriptions.
+              </p>
+              <div v-if="push.vapidPublicKey" class="space-y-2">
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Public key</p>
+                <p class="text-xs font-mono break-all bg-gray-50 dark:bg-gray-800 rounded-lg p-2 text-gray-700 dark:text-gray-300 select-all">{{ push.vapidPublicKey }}</p>
+                <p class="text-xs text-gray-400">{{ pushSubscriberCount }} active subscriber{{ pushSubscriberCount !== 1 ? 's' : '' }}</p>
+              </div>
+              <div class="flex gap-2">
+                <UButton
+                  v-if="!push.vapidPublicKey"
+                  icon="i-lucide-key"
+                  :loading="generatingVapid"
+                  @click="generateVapidKeys"
+                >
+                  Generate keys
+                </UButton>
+                <UButton
+                  v-else
+                  icon="i-lucide-refresh-cw"
+                  variant="outline"
+                  color="red"
+                  :loading="generatingVapid"
+                  @click="generateVapidKeys"
+                >
+                  Regenerate keys
+                </UButton>
+              </div>
+            </div>
+          </UCard>
+
+          <!-- Event toggles -->
+          <UCard>
+            <template #header>
+              <p class="text-sm font-semibold text-gray-900 dark:text-white">Notification events</p>
+            </template>
+            <div class="space-y-5">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">New content published</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Broadcast to all subscribers when a content item is first published.</p>
+                </div>
+                <USwitch v-model="push.eventsContentPublished" :disabled="!push.vapidPublicKey" />
+              </div>
+              <UDivider />
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">Payment confirmation</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Notify the member when their subscription is activated.</p>
+                </div>
+                <USwitch v-model="push.eventsPaymentConfirmation" :disabled="!push.vapidPublicKey" />
+              </div>
+              <UDivider />
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">Form submission confirmation</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Notify the logged-in member after they submit a contact form.</p>
+                </div>
+                <USwitch v-model="push.eventsFormSubmission" :disabled="!push.vapidPublicKey" />
+              </div>
+            </div>
+            <template #footer>
+              <div class="flex justify-end">
+                <UButton :loading="saving" :disabled="!push.vapidPublicKey" @click="save">Save changes</UButton>
+              </div>
+            </template>
+          </UCard>
+
+          <!-- Test and manual broadcast -->
+          <UCard>
+            <template #header>
+              <p class="text-sm font-semibold text-gray-900 dark:text-white">Send notification</p>
+            </template>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">Test push</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Sends a test notification to your own browser (you must be subscribed).</p>
+                </div>
+                <UButton
+                  variant="outline"
+                  icon="i-lucide-send"
+                  size="sm"
+                  :loading="sendingTestPush"
+                  :disabled="!push.vapidPublicKey"
+                  @click="sendTestPush"
+                >
+                  Send test
+                </UButton>
+              </div>
+
+              <UDivider />
+
+              <p class="text-sm font-medium text-gray-900 dark:text-white">Broadcast to all subscribers</p>
+              <UFormField label="Title">
+                <UInput v-model="broadcastTitle" placeholder="Notification title" :disabled="!push.vapidPublicKey" />
+              </UFormField>
+              <UFormField label="Message">
+                <UTextarea v-model="broadcastBody" placeholder="Notification body text" :disabled="!push.vapidPublicKey" />
+              </UFormField>
+              <UFormField label="Link (optional)" hint="Absolute path e.g. /blog/my-post">
+                <UInput v-model="broadcastUrl" placeholder="https://yoursite.com/page" :disabled="!push.vapidPublicKey" />
+              </UFormField>
+              <div class="flex justify-end">
+                <UButton
+                  icon="i-lucide-megaphone"
+                  :loading="broadcasting"
+                  :disabled="!push.vapidPublicKey || !broadcastTitle || !broadcastBody"
+                  @click="sendBroadcast"
+                >
+                  Broadcast
+                </UButton>
+              </div>
+            </div>
+          </UCard>
+
         </template>
 
         <!-- Security -->

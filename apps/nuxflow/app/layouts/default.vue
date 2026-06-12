@@ -5,5 +5,6 @@
       <slot />
     </main>
     <ClientOnly><PublicCookieConsent /></ClientOnly>
+    <ClientOnly><PublicPushNotificationBanner /></ClientOnly>
   </div>
 </template>

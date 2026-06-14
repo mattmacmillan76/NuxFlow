@@ -191,6 +191,75 @@ See the [Installation Guide](./installation.md) for details on how to assign rol
 
 ---
 
+## Running Separate NuxFlow Instances
+
+The multi-site approach described above — multiple domains on one Worker and one database — is the right choice for most hosting scenarios. However, there are cases where you might want to run **completely separate, independent NuxFlow deployments**, each with its own Worker, its own database, and no shared infrastructure:
+
+- Hosting sites for different clients where strict billing or operational isolation is required
+- Running a staging environment that is fully independent of production
+- Segmenting categories of sites (e.g. a set of e-commerce sites on one instance, a set of blogs on another)
+
+### The worker name is not baked into the code
+
+Renaming or duplicating a NuxFlow deployment is a `wrangler.toml`-only change. No application code or server routes reference the worker name — it only appears in two places:
+
+```toml
+name = "nuxflow"          # The Worker's name on Cloudflare
+database_name = "nuxflow" # The D1 database's display name (independent of the worker name)
+```
+
+The binding names that the application actually uses (`DB`, `PLUGIN_KV`, `LOADER`) stay the same regardless of what the worker or database is called. You can rename one, both, or neither — the code does not care.
+
+### Setting up a second deployment
+
+Start from `apps/nuxflow/wrangler.toml.example` and update the following before deploying:
+
+**1. Change the worker name**
+
+```toml
+name = "my-blog-platform"
+```
+
+**2. Create and wire up a new D1 database**
+
+```bash
+wrangler d1 create my-blog-platform
+```
+
+Paste the returned `database_id` into the new `wrangler.toml`:
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "my-blog-platform"
+database_id = "YOUR_NEW_DATABASE_ID"
+```
+
+**3. Create new KV namespaces**
+
+```bash
+wrangler kv namespace create PLUGIN_KV
+wrangler kv namespace create PLUGIN_KV --preview
+```
+
+Paste both IDs into `[[kv_namespaces]]`.
+
+**4. Set secrets for the new worker**
+
+Pass `--name` to target the correct Worker:
+
+```bash
+wrangler secret put NUXT_BETTER_AUTH_SECRET --name my-blog-platform
+```
+
+Then build and deploy as normal. The second instance appears as a separate Worker in your Cloudflare dashboard, has its own D1 and KV, and shares no data with the first.
+
+::note
+Each NuxFlow instance runs its own setup wizard (`/setup`) and maintains its own user database. Super admin accounts do not cross instance boundaries — a super admin on one instance has no access to another.
+::
+
+---
+
 ## Gotcha: Custom Domains Being Wiped on Deploy? ⚠️
 
 A common Cloudflare Wrangler gotcha in multi-site setups is custom domains being deleted or wiped every time you redeploy changes using `wrangler deploy` (or `pnpm run deploy`).

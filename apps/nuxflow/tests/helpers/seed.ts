@@ -15,6 +15,8 @@ import {
   membershipTiers,
   subscriptions,
   siteSettings,
+  media,
+  videoAssets,
 } from '@nuxflow/db/schema'
 import type { TestDb } from './db'
 
@@ -173,6 +175,53 @@ export async function seedSubscription(
     currentPeriodEnd: periodEnd,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    ...overrides,
+  })
+  return id
+}
+
+// ---------------------------------------------------------------------------
+// Media
+// ---------------------------------------------------------------------------
+
+export async function seedMedia(
+  db: TestDb,
+  siteId: string,
+  overrides: Partial<typeof media.$inferInsert> = {},
+) {
+  const id = overrides.id ?? ulid()
+  await db.insert(media).values({
+    id,
+    siteId,
+    filename: `file-${id.toLowerCase()}.jpg`,
+    originalName: 'photo.jpg',
+    mimeType: 'image/jpeg',
+    size: 204800,
+    url: `https://example.com/${id.toLowerCase()}.jpg`,
+    storageKey: `media/${id.toLowerCase()}.jpg`,
+    storageProvider: 'cloudflare',
+    ...overrides,
+  })
+  return id
+}
+
+// ---------------------------------------------------------------------------
+// Video assets
+// ---------------------------------------------------------------------------
+
+export async function seedVideoAsset(
+  db: TestDb,
+  siteId: string,
+  overrides: Partial<typeof videoAssets.$inferInsert> = {},
+) {
+  const id = overrides.id ?? ulid()
+  const streamId = overrides.cloudflareStreamId ?? ulid().toLowerCase()
+  await db.insert(videoAssets).values({
+    id,
+    siteId,
+    cloudflareStreamId: streamId,
+    title: 'Test Video',
+    status: 'ready',
     ...overrides,
   })
   return id

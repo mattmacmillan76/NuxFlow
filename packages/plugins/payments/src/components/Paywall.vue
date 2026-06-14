@@ -3,9 +3,14 @@ defineProps<{
   tiers?: Array<{ id: string; name: string; price: number; currency: string; interval: 'month' | 'year'; features: string[] }>
 }>()
 
+const { loggedIn } = useUserSession()
 const loading = ref<string | null>(null)
 
 async function subscribe(tierId: string) {
+  if (!loggedIn.value) {
+    window.location.href = `/register?redirect=${encodeURIComponent(window.location.pathname)}`
+    return
+  }
   loading.value = tierId
   try {
     const { url } = await $fetch<{ url: string }>('/api/v1/memberships/checkout', {
@@ -13,6 +18,8 @@ async function subscribe(tierId: string) {
       body: { tierId, returnUrl: window.location.href },
     })
     window.location.href = url
+  } catch (err) {
+    console.error('[paywall] Checkout error:', err)
   } finally {
     loading.value = null
   }

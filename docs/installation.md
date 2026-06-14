@@ -17,7 +17,7 @@ Install the following tools before you begin:
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/nuxflow/nuxflow.git
+git clone https://github.com/mattmacmillan76/NuxFlow.git
 cd nuxflow
 pnpm install
 ```
@@ -44,6 +44,8 @@ Start the dev server from the `apps/nuxflow` directory:
 cd apps/nuxflow
 wrangler dev
 ```
+
+The first run will compile the Nuxt app before starting (this takes about a minute). Subsequent starts reuse the compiled output and are much faster. To pick up source code changes, stop the server and run `wrangler dev` again — or rebuild manually with `pnpm build` from the repo root and then restart.
 
 Database migrations run automatically on the first request. Visit `http://localhost:8787/setup` to complete the onboarding wizard. Once setup is complete, you can access your admin dashboard at `http://localhost:8787/admin`.
 
@@ -240,13 +242,13 @@ Connecting NuxFlow to GitHub lets Cloudflare rebuild and redeploy your site auto
 
 ### Fork the Repository First
 
-Rather than connecting Cloudflare directly to the `nuxflow/nuxflow` repository, we strongly recommend creating your own fork on GitHub first.
+Rather than connecting Cloudflare directly to the `mattmacmillan76/NuxFlow` repository, we strongly recommend creating your own fork on GitHub first.
 
 Deploying from a fork means you control when upstream updates are pulled in, so a new NuxFlow release never lands on your live site without your review. It also gives you a place to add site-specific customisations and to run a staging environment — for example, a second Cloudflare Worker connected to the same fork's `staging` branch — before changes reach production.
 
 To fork:
 
-1. Go to [github.com/nuxflow/nuxflow](https://github.com/nuxflow/nuxflow) and click **Fork**
+1. Go to [github.com/mattmacmillan76/NuxFlow](https://github.com/mattmacmillan76/NuxFlow) and click **Fork**
 2. Clone your fork and use it as the basis for your deployment
 
 ### Connect Your Fork to Cloudflare
@@ -354,6 +356,50 @@ Cloudflare Images provides optimised media hosting with automatic resizing and C
 wrangler secret put NUXT_CLOUDFLARE_IMAGES_TOKEN
 wrangler secret put NUXT_CLOUDFLARE_ACCOUNT_ID
 ```
+
+### Cloudflare Stream
+
+Cloudflare Stream provides high-performance video hosting, encoding, and adaptive-bitrate streaming. When configured, NuxFlow enables a dedicated **Videos** tab in the media library where users can upload and manage videos directly from the browser (via the TUS resumable chunked upload protocol).
+
+1. Enable **Stream** on your Cloudflare dashboard.
+2. Create an API token with **Stream:Edit** permissions (go to your profile → API Tokens → Create Token → Custom Token, and select Account → Stream → Edit).
+3. Add the following secrets from the `apps/nuxflow` directory:
+
+```bash
+wrangler secret put NUXT_CLOUDFLARE_ACCOUNT_ID
+wrangler secret put NUXT_CLOUDFLARE_STREAM_TOKEN
+```
+*(Note: If you have already configured `NUXT_CLOUDFLARE_ACCOUNT_ID` for Cloudflare Images, you only need to add `NUXT_CLOUDFLARE_STREAM_TOKEN`.)*
+
+### S3-Compatible Storage (AWS S3, Backblaze B2, Cloudflare R2, etc.)
+
+To use S3-compatible storage instead of Cloudflare Images:
+1. Create a bucket and credentials in your S3 provider.
+2. Add the following secrets:
+```bash
+wrangler secret put S3_BUCKET
+wrangler secret put S3_ACCESS_KEY
+wrangler secret put S3_SECRET_KEY
+```
+Optional variables can also be set to specify a region, custom endpoint, and custom public delivery URL:
+```bash
+wrangler secret put S3_REGION
+wrangler secret put S3_ENDPOINT
+wrangler secret put S3_PUBLIC_URL
+```
+Setting the `S3_BUCKET` secret automatically activates the S3 provider.
+
+### Bunny.net Storage
+
+To use Bunny.net storage:
+1. Create a storage zone and pull zone on Bunny.net.
+2. Add the following secrets:
+```bash
+wrangler secret put BUNNY_API_KEY
+wrangler secret put BUNNY_STORAGE_ZONE
+wrangler secret put BUNNY_PULL_ZONE
+```
+Setting the `BUNNY_API_KEY` secret automatically activates the Bunny.net provider.
 
 ### Spam Protection (Turnstile)
 

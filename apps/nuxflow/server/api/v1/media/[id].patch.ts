@@ -9,6 +9,8 @@ const bodySchema = z.object({
   altText: z.string().max(500).nullable().optional(),
   caption: z.string().max(1000).nullable().optional(),
   folderId: z.string().nullable().optional(),
+  focalX: z.number().int().min(0).max(100).nullable().optional(),
+  focalY: z.number().int().min(0).max(100).nullable().optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -29,7 +31,7 @@ export default defineEventHandler(async (event) => {
     action: 'update',
     resource: 'media',
     resourceId: id,
-    before: { altText: existing.altText, caption: existing.caption, folderId: existing.folderId },
+    before: { altText: existing.altText, caption: existing.caption, folderId: existing.folderId, focalX: existing.focalX, focalY: existing.focalY },
     after: body,
   })
 

@@ -175,7 +175,6 @@ export default defineServerAuth((ctx) => {
         }
       },
     },
-    rateLimit: { enabled: false },
     account: {
       accountLinking: {
         enabled: true,

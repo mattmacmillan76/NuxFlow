@@ -64,6 +64,9 @@ globalThis.readValidatedBody = async (
   return parser(body)
 }
 
+globalThis.readRawBody = async (event: Record<string, unknown>): Promise<string | undefined> =>
+  (event as { _rawBody?: string })._rawBody
+
 globalThis.sendRedirect = vi.fn(async (event: Record<string, unknown>, url: string, code = 302) => {
   ;(event as { _redirect?: { url: string; code: number } })._redirect = { url, code }
   return null
@@ -83,6 +86,8 @@ globalThis.useRuntimeConfig = () => ({
   betterAuthSecret: 'test-secret-exactly-32-chars-ok!',
   tursoUrl: '',
   tursoAuthToken: '',
+  cloudflareAccountId: '',
+  cloudflareStreamToken: '',
   nuxtPublic: {},
 })
 

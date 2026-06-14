@@ -1,0 +1,377 @@
+import { describe, it, expect } from 'vitest'
+import {
+  CANVAS_BLOCKS,
+  getBlockDefinition,
+  registerBlockDefinition,
+  getPluginBlockDefinitions,
+} from '../../../../packages/plugins/canvas/src/blocks/definitions'
+
+// ---------------------------------------------------------------------------
+// Block registry structure
+// ---------------------------------------------------------------------------
+
+describe('CANVAS_BLOCKS registry', () => {
+  it('contains all required built-in blocks', () => {
+    const ids = CANVAS_BLOCKS.map(b => b.id)
+    expect(ids).toContain('canvas-hero')
+    expect(ids).toContain('canvas-text')
+    expect(ids).toContain('canvas-image')
+    expect(ids).toContain('canvas-video')
+    expect(ids).toContain('canvas-columns')
+    expect(ids).toContain('canvas-features')
+    expect(ids).toContain('canvas-testimonial')
+    expect(ids).toContain('canvas-cta')
+    expect(ids).toContain('canvas-spacer')
+    expect(ids).toContain('canvas-gdpr')
+    expect(ids).toContain('canvas-footer')
+    expect(ids).toContain('canvas-button')
+    expect(ids).toContain('canvas-accordion')
+    expect(ids).toContain('canvas-pricing')
+  })
+
+  it('every block has required metadata fields', () => {
+    for (const block of CANVAS_BLOCKS) {
+      expect(typeof block.id, `${block.id} missing id`).toBe('string')
+      expect(typeof block.name, `${block.id} missing name`).toBe('string')
+      expect(typeof block.component, `${block.id} missing component`).toBe('string')
+      expect(typeof block.category, `${block.id} missing category`).toBe('string')
+      expect(Array.isArray(block.fields), `${block.id} fields not array`).toBe(true)
+      expect(typeof block.defaultProps, `${block.id} missing defaultProps`).toBe('object')
+    }
+  })
+
+  it('every block has unique ids', () => {
+    const ids = CANVAS_BLOCKS.map(b => b.id)
+    const unique = new Set(ids)
+    expect(unique.size).toBe(ids.length)
+  })
+
+  it('every field with type select has non-empty options', () => {
+    for (const block of CANVAS_BLOCKS) {
+      for (const field of block.fields) {
+        if (field.type === 'select') {
+          expect(
+            Array.isArray(field.options) && field.options.length > 0,
+            `${block.id}.${field.key} select has no options`,
+          ).toBe(true)
+        }
+      }
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// GDPR block
+// ---------------------------------------------------------------------------
+
+describe('canvas-gdpr block definition', () => {
+  const gdpr = CANVAS_BLOCKS.find(b => b.id === 'canvas-gdpr')!
+
+  it('exists in the registry', () => {
+    expect(gdpr).toBeDefined()
+  })
+
+  it('is in the cta category', () => {
+    expect(gdpr.category).toBe('cta')
+  })
+
+  it('has targeting field with correct options', () => {
+    const targeting = gdpr.fields.find(f => f.key === 'targeting')!
+    expect(targeting).toBeDefined()
+    expect(targeting.type).toBe('select')
+    const values = (targeting.options as { value: string }[]).map(o => o.value)
+    expect(values).toContain('everyone')
+    expect(values).toContain('gdpr-only')
+  })
+
+  it('defaults to gdpr-only targeting', () => {
+    expect(gdpr.defaultProps.targeting).toBe('gdpr-only')
+  })
+
+  it('has showPreferences toggle field', () => {
+    const toggle = gdpr.fields.find(f => f.key === 'showPreferences')
+    expect(toggle).toBeDefined()
+    expect(toggle?.type).toBe('toggle')
+  })
+
+  it('preferencesLabel field is conditional on showPreferences', () => {
+    const prefLabel = gdpr.fields.find(f => f.key === 'preferencesLabel')!
+    expect(typeof prefLabel.condition).toBe('function')
+    expect(prefLabel.condition!({ showPreferences: true })).toBe(true)
+    expect(prefLabel.condition!({ showPreferences: false })).toBe(false)
+  })
+
+  it('has required colour fields', () => {
+    const keys = gdpr.fields.map(f => f.key)
+    expect(keys).toContain('bgColor')
+    expect(keys).toContain('textColor')
+    expect(keys).toContain('btnColor')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Video block
+// ---------------------------------------------------------------------------
+
+describe('canvas-video block definition', () => {
+  const video = CANVAS_BLOCKS.find(b => b.id === 'canvas-video')!
+
+  it('exists in the registry', () => {
+    expect(video).toBeDefined()
+  })
+
+  it('is in the media category', () => {
+    expect(video.category).toBe('media')
+  })
+
+  it('has url field of type url', () => {
+    const urlField = video.fields.find(f => f.key === 'url')
+    expect(urlField?.type).toBe('url')
+  })
+
+  it('has aspectRatio select with all expected values', () => {
+    const ar = video.fields.find(f => f.key === 'aspectRatio')!
+    expect(ar.type).toBe('select')
+    const values = (ar.options as { value: string }[]).map(o => o.value)
+    expect(values).toContain('16:9')
+    expect(values).toContain('4:3')
+    expect(values).toContain('1:1')
+    expect(values).toContain('9:16')
+  })
+
+  it('defaults to 16:9 aspect ratio and no autoplay', () => {
+    expect(video.defaultProps.aspectRatio).toBe('16:9')
+    expect(video.defaultProps.autoplay).toBe(false)
+    expect(video.defaultProps.muted).toBe(false)
+  })
+
+  it('muted field is conditional on autoplay', () => {
+    const muted = video.fields.find(f => f.key === 'muted')!
+    expect(typeof muted.condition).toBe('function')
+    expect(muted.condition!({ autoplay: true })).toBe(true)
+    expect(muted.condition!({ autoplay: false })).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Image block focal point
+// ---------------------------------------------------------------------------
+
+describe('canvas-image block definition', () => {
+  const image = CANVAS_BLOCKS.find(b => b.id === 'canvas-image')!
+
+  it('has focalX and focalY number fields', () => {
+    const fx = image.fields.find(f => f.key === 'focalX')
+    const fy = image.fields.find(f => f.key === 'focalY')
+    expect(fx?.type).toBe('number')
+    expect(fy?.type).toBe('number')
+  })
+
+  it('focal fields are constrained 0–100', () => {
+    const fx = image.fields.find(f => f.key === 'focalX')!
+    const fy = image.fields.find(f => f.key === 'focalY')!
+    expect(fx.min).toBe(0)
+    expect(fx.max).toBe(100)
+    expect(fy.min).toBe(0)
+    expect(fy.max).toBe(100)
+  })
+
+  it('defaults focal point to center (50, 50)', () => {
+    expect(image.defaultProps.focalX).toBe(50)
+    expect(image.defaultProps.focalY).toBe(50)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getBlockDefinition lookup
+// ---------------------------------------------------------------------------
+
+describe('getBlockDefinition', () => {
+  it('returns a block for a known id', () => {
+    const def = getBlockDefinition('canvas-hero')
+    expect(def).toBeDefined()
+    expect(def?.id).toBe('canvas-hero')
+  })
+
+  it('returns undefined for an unknown id', () => {
+    expect(getBlockDefinition('canvas-does-not-exist')).toBeUndefined()
+  })
+
+  it('returns plugin-registered blocks', () => {
+    registerBlockDefinition({
+      id: 'test-plugin-block',
+      name: 'Test Plugin',
+      description: 'A test block',
+      icon: 'i-lucide-box',
+      category: 'content',
+      component: 'TestPluginBlock',
+      thumbnailColor: '#fff',
+      fields: [],
+      defaultProps: {},
+    })
+
+    const def = getBlockDefinition('test-plugin-block')
+    expect(def).toBeDefined()
+    expect(def?.id).toBe('test-plugin-block')
+  })
+
+  it('does not register the same plugin block twice', () => {
+    const before = getPluginBlockDefinitions().length
+    registerBlockDefinition({
+      id: 'test-plugin-block',
+      name: 'Test Plugin',
+      description: 'Duplicate',
+      icon: 'i-lucide-box',
+      category: 'content',
+      component: 'TestPluginBlock',
+      thumbnailColor: '#fff',
+      fields: [],
+      defaultProps: {},
+    })
+
+    expect(getPluginBlockDefinitions().length).toBe(before)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Video URL parsing logic (mirrors CanvasBlockVideo.vue embedUrl)
+// ---------------------------------------------------------------------------
+
+// Extracted from CanvasBlockVideo.vue for isolated unit testing
+function buildEmbedUrl(
+  url: string,
+  autoplay: boolean,
+  muted: boolean,
+): string | null {
+  const raw = url.trim()
+  if (!raw) return null
+
+  // Cloudflare Stream
+  const cfStream = raw.match(
+    /(?:videodelivery\.net\/|cloudflarestream\.com\/|watch\.cloudflarestream\.com\/|^)([a-f0-9]{32})(?:\/iframe)?$/i,
+  )
+  if (cfStream) {
+    const params = new URLSearchParams()
+    if (autoplay) params.set('autoplay', 'true')
+    if (muted) params.set('muted', 'true')
+    params.set('controls', 'true')
+    return `https://iframe.videodelivery.net/${cfStream[1]}?${params}`
+  }
+
+  // YouTube
+  const yt = raw.match(
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{11})/,
+  )
+  if (yt) {
+    const params = new URLSearchParams({ rel: '0', modestbranding: '1' })
+    if (autoplay) params.set('autoplay', '1')
+    if (muted) params.set('mute', '1')
+    return `https://www.youtube.com/embed/${yt[1]}?${params}`
+  }
+
+  // Vimeo
+  const vimeo = raw.match(/vimeo\.com\/(\d+)/)
+  if (vimeo) {
+    const params = new URLSearchParams()
+    if (autoplay) params.set('autoplay', '1')
+    if (muted) params.set('muted', '1')
+    return `https://player.vimeo.com/video/${vimeo[1]}?${params}`
+  }
+
+  return null
+}
+
+describe('Video embed URL parsing', () => {
+  describe('YouTube', () => {
+    it('parses a standard youtube.com/watch URL', () => {
+      const url = buildEmbedUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', false, false)
+      expect(url).toContain('youtube.com/embed/dQw4w9WgXcQ')
+    })
+
+    it('parses a short youtu.be URL', () => {
+      const url = buildEmbedUrl('https://youtu.be/dQw4w9WgXcQ', false, false)
+      expect(url).toContain('youtube.com/embed/dQw4w9WgXcQ')
+    })
+
+    it('parses an already-embedded youtube URL', () => {
+      const url = buildEmbedUrl('https://www.youtube.com/embed/dQw4w9WgXcQ', false, false)
+      expect(url).toContain('youtube.com/embed/dQw4w9WgXcQ')
+    })
+
+    it('includes autoplay param when enabled', () => {
+      const url = buildEmbedUrl('https://youtu.be/dQw4w9WgXcQ', true, false)!
+      expect(url).toContain('autoplay=1')
+    })
+
+    it('includes mute param when muted is enabled', () => {
+      const url = buildEmbedUrl('https://youtu.be/dQw4w9WgXcQ', false, true)!
+      expect(url).toContain('mute=1')
+    })
+
+    it('always includes rel=0 and modestbranding', () => {
+      const url = buildEmbedUrl('https://youtu.be/dQw4w9WgXcQ', false, false)!
+      expect(url).toContain('rel=0')
+      expect(url).toContain('modestbranding=1')
+    })
+  })
+
+  describe('Vimeo', () => {
+    it('parses a vimeo.com URL', () => {
+      const url = buildEmbedUrl('https://vimeo.com/123456789', false, false)
+      expect(url).toContain('player.vimeo.com/video/123456789')
+    })
+
+    it('includes autoplay param when enabled', () => {
+      const url = buildEmbedUrl('https://vimeo.com/987654321', true, false)!
+      expect(url).toContain('autoplay=1')
+    })
+
+    it('includes muted param when enabled', () => {
+      const url = buildEmbedUrl('https://vimeo.com/987654321', false, true)!
+      expect(url).toContain('muted=1')
+    })
+  })
+
+  describe('Cloudflare Stream', () => {
+    const cfUid = 'abcdef1234567890abcdef1234567890'
+
+    it('parses a videodelivery.net URL', () => {
+      const url = buildEmbedUrl(`https://iframe.videodelivery.net/${cfUid}`, false, false)
+      expect(url).toContain(`iframe.videodelivery.net/${cfUid}`)
+    })
+
+    it('parses a bare 32-char hex UID', () => {
+      const url = buildEmbedUrl(cfUid, false, false)
+      expect(url).toContain(`iframe.videodelivery.net/${cfUid}`)
+    })
+
+    it('always includes controls=true', () => {
+      const url = buildEmbedUrl(cfUid, false, false)!
+      expect(url).toContain('controls=true')
+    })
+
+    it('includes autoplay when enabled', () => {
+      const url = buildEmbedUrl(cfUid, true, false)!
+      expect(url).toContain('autoplay=true')
+    })
+
+    it('includes muted when enabled', () => {
+      const url = buildEmbedUrl(cfUid, false, true)!
+      expect(url).toContain('muted=true')
+    })
+  })
+
+  describe('invalid / unrecognised URLs', () => {
+    it('returns null for an empty string', () => {
+      expect(buildEmbedUrl('', false, false)).toBeNull()
+    })
+
+    it('returns null for a non-video URL', () => {
+      expect(buildEmbedUrl('https://example.com/page', false, false)).toBeNull()
+    })
+
+    it('returns null for a random string', () => {
+      expect(buildEmbedUrl('not a url at all', false, false)).toBeNull()
+    })
+  })
+})

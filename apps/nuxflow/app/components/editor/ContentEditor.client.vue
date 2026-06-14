@@ -4,6 +4,10 @@ import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
+import Link from '@tiptap/extension-link'
+import Underline from '@tiptap/extension-underline'
+import Highlight from '@tiptap/extension-highlight'
+import { TableKit } from '@tiptap/extension-table'
 
 const props = defineProps<{ modelValue: unknown }>()
 const emit = defineEmits<{ 'update:modelValue': [value: unknown] }>()
@@ -54,6 +58,23 @@ function onAiReplace(text: string) {
   aiSelectionText.value = ''
 }
 
+function setLink() {
+  if (!editor.value) return
+  const previousUrl = editor.value.getAttributes('link').href
+  const url = window.prompt('Enter URL:', previousUrl || '')
+
+  if (url === null) {
+    return
+  }
+
+  if (url === '') {
+    editor.value.chain().focus().extendMarkRange('link').unsetLink().run()
+    return
+  }
+
+  editor.value.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 const editor = useEditor({
@@ -64,6 +85,18 @@ const editor = useEditor({
       allowBase64: true,
     }),
     Placeholder.configure({ placeholder: 'Start writing your content here…' }),
+    Link.configure({
+      openOnClick: false,
+      autolink: true,
+      defaultProtocol: 'https',
+    }),
+    Underline,
+    Highlight,
+    TableKit.configure({
+      table: {
+        resizable: true,
+      },
+    }),
   ],
   content: (props.modelValue as object) ?? { type: 'doc', content: [{ type: 'paragraph' }] },
   editorProps: { attributes: { class: 'nux-editor-prose' } },
@@ -269,8 +302,19 @@ const tools = computed((): ToolGroup[] => {
       items: [
         { icon: 'i-lucide-bold', label: 'Bold', active: e.isActive('bold'), action: () => (e.chain().focus() as any).toggleBold().run() },
         { icon: 'i-lucide-italic', label: 'Italic', active: e.isActive('italic'), action: () => (e.chain().focus() as any).toggleItalic().run() },
+        { icon: 'i-lucide-underline', label: 'Underline', active: e.isActive('underline'), action: () => (e.chain().focus() as any).toggleUnderline().run() },
         { icon: 'i-lucide-strikethrough', label: 'Strikethrough', active: e.isActive('strike'), action: () => (e.chain().focus() as any).toggleStrike().run() },
+        { icon: 'i-lucide-highlighter', label: 'Highlight', active: e.isActive('highlight'), action: () => (e.chain().focus() as any).toggleHighlight().run() },
         { icon: 'i-lucide-code', label: 'Inline code', active: e.isActive('code'), action: () => (e.chain().focus() as any).toggleCode().run() },
+      ],
+    },
+    {
+      group: 'links',
+      items: [
+        { icon: 'i-lucide-link', label: 'Link', active: e.isActive('link'), action: () => setLink() },
+        ...(e.isActive('link') ? [
+          { icon: 'i-lucide-unlink', label: 'Remove Link', action: () => e.chain().focus().unsetLink().run() },
+        ] : []),
       ],
     },
     {
@@ -281,6 +325,21 @@ const tools = computed((): ToolGroup[] => {
         { icon: 'i-lucide-text-quote', label: 'Blockquote', active: e.isActive('blockquote'), action: () => (e.chain().focus() as any).toggleBlockquote().run() },
         { icon: 'i-lucide-square-code', label: 'Code block', active: e.isActive('codeBlock'), action: () => (e.chain().focus() as any).toggleCodeBlock().run() },
         { icon: 'i-lucide-minus', label: 'Divider', action: () => (e.chain().focus() as any).setHorizontalRule().run() },
+      ],
+    },
+    {
+      group: 'tables',
+      items: [
+        { icon: 'i-lucide-table', label: 'Insert Table', action: () => (e.chain().focus() as any).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
+        ...(e.isActive('table') ? [
+          { icon: 'i-lucide-row-insert-top', label: 'Add Row Above', action: () => (e.chain().focus() as any).addRowBefore().run() },
+          { icon: 'i-lucide-row-insert-bottom', label: 'Add Row Below', action: () => (e.chain().focus() as any).addRowAfter().run() },
+          { icon: 'i-lucide-column-insert-left', label: 'Add Column Left', action: () => (e.chain().focus() as any).addColumnBefore().run() },
+          { icon: 'i-lucide-column-insert-right', label: 'Add Column Right', action: () => (e.chain().focus() as any).addColumnAfter().run() },
+          { icon: 'i-lucide-square-minus', label: 'Delete Row', action: () => (e.chain().focus() as any).deleteRow().run() },
+          { icon: 'i-lucide-square-minus', label: 'Delete Column', action: () => (e.chain().focus() as any).deleteColumn().run() },
+          { icon: 'i-lucide-trash-2', label: 'Delete Table', action: () => (e.chain().focus() as any).deleteTable().run() },
+        ] : []),
       ],
     },
     {
@@ -509,4 +568,75 @@ const tools = computed((): ToolGroup[] => {
 .nux-editor-prose hr { border: none; border-top: 1px solid rgba(0,0,0,.12); margin: 1.5rem 0; }
 .dark .nux-editor-prose hr { border-top-color: rgba(255,255,255,.12); }
 .nux-editor-prose img { max-width: 100%; height: auto; border-radius: 0.5rem; margin-top: 1rem; margin-bottom: 1rem; display: inline-block; }
+
+.nux-editor-prose a {
+  color: #00dc82;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.nux-editor-prose u {
+  text-decoration: underline;
+}
+.nux-editor-prose mark {
+  background-color: rgba(253, 224, 71, 0.4);
+  border-radius: 0.125rem;
+  padding: 0.1em 0.2em;
+}
+.dark .nux-editor-prose mark {
+  background-color: rgba(253, 224, 71, 0.3);
+  color: #f3f4f6;
+}
+
+/* Table styles */
+.nux-editor-prose table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 1.5rem 0;
+  overflow: hidden;
+}
+
+.nux-editor-prose th,
+.nux-editor-prose td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 0.75rem;
+  min-width: 1em;
+  position: relative;
+  text-align: left;
+  vertical-align: top;
+}
+
+.dark .nux-editor-prose th,
+.dark .nux-editor-prose td {
+  border-color: #374151;
+}
+
+.nux-editor-prose th {
+  background-color: #f9fafb;
+  font-weight: 600;
+}
+
+.dark .nux-editor-prose th {
+  background-color: #1f2937;
+}
+
+.nux-editor-prose .selectedCell::after {
+  background: rgba(59, 130, 246, 0.08);
+  content: "";
+  left: 0; right: 0; top: 0; bottom: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.nux-editor-prose .column-resize-handle {
+  background-color: #3b82f6;
+  bottom: -2px;
+  position: absolute;
+  right: -2px;
+  top: 0;
+  width: 4px;
+  z-index: 10;
+  cursor: col-resize;
+}
 </style>

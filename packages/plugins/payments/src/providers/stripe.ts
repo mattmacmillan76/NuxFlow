@@ -16,6 +16,34 @@ export class StripeProvider {
     return result.data
   }
 
+  async createProduct(name: string, description?: string) {
+    return this.client.products.create({
+      name,
+      description: description || undefined,
+    })
+  }
+
+  async updateProduct(productId: string, name: string, description?: string) {
+    return this.client.products.update(productId, {
+      name,
+      description: description || undefined,
+    })
+  }
+
+  async createPrice(productId: string, unitAmount: number, currency: string, interval: 'month' | 'year' | 'one_time') {
+    const isRecurring = interval !== 'one_time'
+    return this.client.prices.create({
+      product: productId,
+      unit_amount: Math.round(unitAmount * 100),
+      currency: currency.toLowerCase(),
+      ...(isRecurring ? {
+        recurring: {
+          interval: interval as 'month' | 'year',
+        },
+      } : {}),
+    })
+  }
+
   async createCheckoutSession(opts: {
     customerId: string
     priceId: string

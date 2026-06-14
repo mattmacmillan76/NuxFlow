@@ -19,6 +19,7 @@ export interface MockEventOptions {
   siteId?: string
   session?: MockSession | null
   body?: unknown
+  rawBody?: string
   query?: Record<string, string>
   headers?: Record<string, string>
   params?: Record<string, string>
@@ -36,6 +37,7 @@ export function createMockEvent(opts: MockEventOptions = {}) {
       siteStatus: 'active' as const,
     },
     _body: opts.body,
+    _rawBody: opts.rawBody,
     _query: opts.query ?? {},
     _headers: opts.headers ?? {},
     _params: opts.params ?? {},

@@ -44,12 +44,22 @@ Content follows a simple workflow:
 
 ---
 
-## Media Library
+## Media Library & Video Streaming
 
 Manage all your assets in one place.
-- **Upload**: Drag and drop images or videos directly into the library.
+
+### Standard Media Library
+- **Upload**: Drag and drop images or documents directly into the library.
 - **Editing**: Add Alt Text and Captions to improve SEO and accessibility.
 - **Focal Point**: Set a focal point for images to ensure they crop correctly on different screen sizes.
+
+### Video Library (Cloudflare Stream)
+For video bloggers, NuxFlow features an integrated, high-performance video hosting interface powered by Cloudflare Stream:
+- **Direct-to-Cloudflare Uploads**: Videos are uploaded directly from your browser to Cloudflare using resumable chunked uploads (TUS protocol). This allows uploading very large video files (up to several gigabytes) without hitting edge worker CPU timeouts or server payload limits.
+- **Processing & Transcoding**: Once uploaded, videos are processed into HLS/DASH adaptive bitrate streams in the background. NuxFlow polls the state and automatically updates the video metadata once ready.
+- **Visual Previews**: Play your uploaded videos directly from the dashboard in a popup media player.
+- **Analytics & Metadata**: Track video details and manage titles directly from the Videos admin page.
+
 
 ---
 
@@ -176,7 +186,7 @@ NuxFlow supports two kinds of plugins, both managed from **Admin → Plugins**.
 
 Canvas is a visual drag-and-drop page builder. When enabled, it adds a **Canvas** editor mode to any page or post, letting you build layouts from blocks without writing code.
 
-Available blocks include Hero sections, Text, Image, Video, Columns, Feature grids, Testimonials, CTA banners, and Spacers. Each block has a settings panel for configuring its content and appearance.
+Available blocks include Hero sections, Text, Image, Video (supporting YouTube, Vimeo, and Cloudflare Stream), Columns, Feature grids, Testimonials, CTA banners, and Spacers. Each block has a settings panel for configuring its content and appearance.
 
 To use Canvas on a piece of content, open the content item and switch the editor mode to **Canvas editor** using the toggle at the top of the editor.
 

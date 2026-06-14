@@ -9,6 +9,8 @@ const props = withDefaults(defineProps<{
   width?: 'full' | 'lg' | 'md' | 'sm'
   align?: 'left' | 'center' | 'right'
   rounded?: boolean
+  focalX?: number
+  focalY?: number
   padding?: SpacingValue
 }>(), {
   src: '',
@@ -17,6 +19,8 @@ const props = withDefaults(defineProps<{
   width: 'full',
   align: 'center',
   rounded: false,
+  focalX: 50,
+  focalY: 50,
 })
 
 const widthClass = computed(() => ({
@@ -49,6 +53,7 @@ const containerStyle = computed(() => {
         :alt="alt"
         class="w-full"
         :class="{ 'rounded-xl': rounded }"
+        :style="{ objectPosition: `${focalX}% ${focalY}%` }"
       />
       <div
         v-else

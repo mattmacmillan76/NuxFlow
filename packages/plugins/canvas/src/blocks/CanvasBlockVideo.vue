@@ -35,6 +35,16 @@ const embedUrl = computed(() => {
   const raw = props.url?.trim()
   if (!raw) return null
 
+  // Cloudflare Stream
+  const cfStream = raw.match(/(?:videodelivery\.net\/|cloudflarestream\.com\/|watch\.cloudflarestream\.com\/|^)([a-f0-9]{32})(?:\/iframe)?$/i)
+  if (cfStream) {
+    const params = new URLSearchParams()
+    if (props.autoplay) params.set('autoplay', 'true')
+    if (props.muted) params.set('muted', 'true')
+    params.set('controls', 'true')
+    return `https://iframe.videodelivery.net/${cfStream[1]}?${params}`
+  }
+
   // YouTube
   const yt = raw.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/)
   if (yt) {
@@ -80,7 +90,7 @@ const embedUrl = computed(() => {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <p class="text-sm">Paste a YouTube or Vimeo URL</p>
+      <p class="text-sm">Paste a YouTube, Vimeo, or Cloudflare Stream URL</p>
     </div>
 
     <p v-if="caption" class="mt-2 text-sm text-gray-500 text-center">{{ caption }}</p>

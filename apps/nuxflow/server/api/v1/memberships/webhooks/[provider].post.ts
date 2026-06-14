@@ -2,6 +2,7 @@ import type { H3Event } from 'h3'
 import { subscriptions, membershipTiers } from '@nuxflow/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { ulid } from 'ulid'
+import { useDb } from '../../../../utils/db'
 import { StripeProvider } from '@nuxflow/plugin-payments/providers/stripe'
 import { LemonSqueezyProvider } from '@nuxflow/plugin-payments/providers/lemonsqueezy'
 import { PaddleProvider } from '@nuxflow/plugin-payments/providers/paddle'
@@ -21,13 +22,19 @@ async function maybeSendPaymentPush(event: H3Event, userId: string, tierName: st
 // ── Stripe ───────────────────────────────────────────────────────────────────
 
 async function handleStripeWebhook(event: H3Event, rawBody: string) {
-  const config = useRuntimeConfig()
-  const stripe = new StripeProvider(config.stripeSecretKey as string)
+  const stripeSecretKey = await resolveSetting(event, 'payments.stripe_secret_key', 'stripeSecretKey')
+  const stripeWebhookSecret = await resolveSetting(event, 'payments.stripe_webhook_secret', 'stripeWebhookSecret')
+  
+  if (!stripeSecretKey) {
+    throw createError({ statusCode: 503, message: 'Stripe is not configured' })
+  }
+
+  const stripe = new StripeProvider(stripeSecretKey as string)
   const sig = getHeader(event, 'stripe-signature') ?? ''
 
   let stripeEvent: ReturnType<StripeProvider['constructWebhookEvent']>
   try {
-    stripeEvent = stripe.constructWebhookEvent(Buffer.from(rawBody), sig, config.stripeWebhookSecret as string)
+    stripeEvent = stripe.constructWebhookEvent(Buffer.from(rawBody), sig, stripeWebhookSecret as string)
   } catch {
     throw createError({ statusCode: 400, message: 'Invalid Stripe webhook signature' })
   }
@@ -90,11 +97,18 @@ async function handleStripeWebhook(event: H3Event, rawBody: string) {
 // ── Lemon Squeezy ────────────────────────────────────────────────────────────
 
 async function handleLemonSqueezyWebhook(event: H3Event, rawBody: string) {
-  const config = useRuntimeConfig()
-  const ls = new LemonSqueezyProvider(config.lsApiKey as string, config.lsStoreId as string)
+  const lsApiKey = await resolveSetting(event, 'payments.ls_api_key', 'lsApiKey')
+  const lsStoreId = await resolveSetting(event, 'payments.ls_store_id', 'lsStoreId')
+  const lsWebhookSecret = await resolveSetting(event, 'payments.ls_webhook_secret', 'lsWebhookSecret')
+
+  if (!lsApiKey || !lsStoreId) {
+    throw createError({ statusCode: 503, message: 'Lemon Squeezy is not configured' })
+  }
+
+  const ls = new LemonSqueezyProvider(lsApiKey as string, lsStoreId as string)
   const sig = getHeader(event, 'x-signature') ?? ''
 
-  const valid = await ls.verifyWebhook(rawBody, sig, config.lsWebhookSecret as string)
+  const valid = await ls.verifyWebhook(rawBody, sig, lsWebhookSecret as string)
   if (!valid) throw createError({ statusCode: 400, message: 'Invalid Lemon Squeezy webhook signature' })
 
   const payload = JSON.parse(rawBody) as {
@@ -146,11 +160,18 @@ async function handleLemonSqueezyWebhook(event: H3Event, rawBody: string) {
 // ── Paddle ───────────────────────────────────────────────────────────────────
 
 async function handlePaddleWebhook(event: H3Event, rawBody: string) {
-  const config = useRuntimeConfig()
-  const paddle = new PaddleProvider(config.paddleApiKey as string, config.paddleVendorId as string)
+  const paddleApiKey = await resolveSetting(event, 'payments.paddle_api_key', 'paddleApiKey')
+  const paddleVendorId = await resolveSetting(event, 'payments.paddle_vendor_id', 'paddleVendorId')
+  const paddleWebhookPublicKey = await resolveSetting(event, 'payments.paddle_webhook_public_key', 'paddleWebhookPublicKey')
+
+  if (!paddleApiKey || !paddleVendorId) {
+    throw createError({ statusCode: 503, message: 'Paddle is not configured' })
+  }
+
+  const paddle = new PaddleProvider(paddleApiKey as string, paddleVendorId as string)
   const sig = getHeader(event, 'paddle-signature') ?? ''
 
-  const valid = await paddle.verifyWebhook(rawBody, sig, config.paddleWebhookPublicKey as string)
+  const valid = await paddle.verifyWebhook(rawBody, sig, paddleWebhookPublicKey as string)
   if (!valid) throw createError({ statusCode: 400, message: 'Invalid Paddle webhook signature' })
 
   const payload = JSON.parse(rawBody) as {

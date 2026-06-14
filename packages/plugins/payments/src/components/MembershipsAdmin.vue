@@ -12,6 +12,10 @@ interface Tier {
   interval: 'month' | 'year' | 'one_time'
   features: string[]
   isActive: boolean
+  stripeProductId?: string | null
+  stripePriceId?: string | null
+  lsVariantId?: string | null
+  paddleProductId?: string | null
   createdAt: string
 }
 
@@ -41,6 +45,7 @@ const subscribers = computed(() => subsData.value?.subscribers ?? [])
 const showTierModal = ref(false)
 const editingTier = ref<Tier | null>(null)
 const tierLoading = ref(false)
+const showAdvanced = ref(false)
 
 const tierForm = reactive({
   name: '',
@@ -50,18 +55,36 @@ const tierForm = reactive({
   interval: 'month' as 'month' | 'year' | 'one_time',
   features: [] as string[],
   isActive: true,
+  stripeProductId: '',
+  stripePriceId: '',
+  lsVariantId: '',
+  paddleProductId: '',
 })
 
 const featureInput = ref('')
 
 function openNewTier() {
   editingTier.value = null
-  Object.assign(tierForm, { name: '', description: '', price: 0, currency: 'USD', interval: 'month', features: [], isActive: true })
+  showAdvanced.value = false
+  Object.assign(tierForm, {
+    name: '',
+    description: '',
+    price: 0,
+    currency: 'USD',
+    interval: 'month',
+    features: [],
+    isActive: true,
+    stripeProductId: '',
+    stripePriceId: '',
+    lsVariantId: '',
+    paddleProductId: '',
+  })
   showTierModal.value = true
 }
 
 function openEditTier(tier: Tier) {
   editingTier.value = tier
+  showAdvanced.value = false
   Object.assign(tierForm, {
     name: tier.name,
     description: tier.description ?? '',
@@ -70,6 +93,10 @@ function openEditTier(tier: Tier) {
     interval: tier.interval,
     features: [...tier.features],
     isActive: tier.isActive,
+    stripeProductId: tier.stripeProductId ?? '',
+    stripePriceId: tier.stripePriceId ?? '',
+    lsVariantId: tier.lsVariantId ?? '',
+    paddleProductId: tier.paddleProductId ?? '',
   })
   showTierModal.value = true
 }
@@ -95,6 +122,10 @@ async function saveTier() {
       interval: tierForm.interval,
       features: tierForm.features,
       isActive: tierForm.isActive,
+      stripeProductId: tierForm.stripeProductId || undefined,
+      stripePriceId: tierForm.stripePriceId || undefined,
+      lsVariantId: tierForm.lsVariantId || undefined,
+      paddleProductId: tierForm.paddleProductId || undefined,
     }
     if (editingTier.value) {
       await $fetch(`/api/v1/memberships/${editingTier.value.id}`, { method: 'PATCH', body })
@@ -189,6 +220,15 @@ const tabs = [
                 <p class="font-semibold text-gray-900 dark:text-white">{{ tier.name }}</p>
                 <UBadge :color="tier.isActive ? 'green' : 'neutral'" variant="soft" size="xs">
                   {{ tier.isActive ? 'Active' : 'Inactive' }}
+                </UBadge>
+                <UBadge v-if="tier.price === 0" color="neutral" variant="soft" size="xs">
+                  Free
+                </UBadge>
+                <UBadge v-else-if="tier.stripePriceId" color="primary" variant="soft" size="xs" title="Synced to Stripe">
+                  Synced
+                </UBadge>
+                <UBadge v-else color="red" variant="soft" size="xs" title="Not synced to Stripe. Save to sync if Stripe is configured.">
+                  Unsynced
                 </UBadge>
               </div>
               <p class="text-2xl font-bold text-primary-500 mt-1">
@@ -308,6 +348,37 @@ const tabs = [
           <UFormField>
             <UCheckbox v-model="tierForm.isActive" label="Active (visible to users)" />
           </UFormField>
+
+          <!-- Advanced/Integration Settings -->
+          <div class="border-t border-gray-100 dark:border-gray-800 pt-3">
+            <button 
+              type="button" 
+              class="text-xs font-semibold text-primary-500 flex items-center gap-1 hover:underline mb-2"
+              @click="showAdvanced = !showAdvanced"
+            >
+              <UIcon :name="showAdvanced ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="w-3.5 h-3.5" />
+              Advanced / Integration IDs
+            </button>
+            
+            <div v-show="showAdvanced" class="mt-2 space-y-3 pl-1">
+              <div class="grid grid-cols-2 gap-3">
+                <UFormField label="Stripe Product ID">
+                  <UInput v-model="tierForm.stripeProductId" placeholder="prod_..." class="w-full text-xs" />
+                </UFormField>
+                <UFormField label="Stripe Price ID">
+                  <UInput v-model="tierForm.stripePriceId" placeholder="price_..." class="w-full text-xs" />
+                </UFormField>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <UFormField label="Lemon Squeezy Variant ID">
+                  <UInput v-model="tierForm.lsVariantId" placeholder="e.g. 12345" class="w-full text-xs" />
+                </UFormField>
+                <UFormField label="Paddle Product/Price ID">
+                  <UInput v-model="tierForm.paddleProductId" placeholder="pri_..." class="w-full text-xs" />
+                </UFormField>
+              </div>
+            </div>
+          </div>
 
           <div class="flex justify-end gap-2 pt-2">
             <UButton variant="ghost" type="button" @click="showTierModal = false">Cancel</UButton>

@@ -1,6 +1,7 @@
 import { z } from 'zod'
-import { membershipTiers } from '@nuxflow/db/schema'
+import { membershipTiers, subscriptions } from '@nuxflow/db/schema'
 import { and, eq } from 'drizzle-orm'
+import { ulid } from 'ulid'
 import { useDb } from '../../../utils/db'
 import { resolveSetting } from '../../../utils/settings'
 import { StripeProvider } from '@nuxflow/plugin-payments/providers/stripe'
@@ -27,6 +28,42 @@ export default defineEventHandler(async (event) => {
   const userId = session.user.id as string
   const userEmail = session.user.email as string
   const userName = (session.user.name ?? '') as string
+
+  // If the tier is free (price = 0), activate the subscription locally immediately
+  if (tier.price === 0) {
+    const existing = await db.query.subscriptions.findFirst({
+      where: and(
+        eq(subscriptions.userId, userId),
+        eq(subscriptions.siteId, siteId),
+        eq(subscriptions.tierId, tier.id)
+      )
+    })
+
+    if (!existing) {
+      await db.insert(subscriptions).values({
+        id: ulid(),
+        siteId,
+        userId,
+        tierId: tier.id,
+        provider: 'stripe',
+        providerSubscriptionId: `free_${ulid()}`,
+        status: 'active',
+        currentPeriodStart: new Date().toISOString(),
+        currentPeriodEnd: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+    } else if (existing.status !== 'active') {
+      await db.update(subscriptions)
+        .set({
+          status: 'active',
+          currentPeriodStart: new Date().toISOString(),
+          currentPeriodEnd: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(subscriptions.id, existing.id))
+    }
+
+    return { url: body.returnUrl }
+  }
 
   // Resolve payment integration keys dynamically (per-tenant override of env variables)
   const stripeSecretKey = await resolveSetting(event, 'payments.stripe_secret_key', 'stripeSecretKey')

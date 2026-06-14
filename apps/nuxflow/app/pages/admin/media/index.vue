@@ -5,6 +5,7 @@ type MediaFile = {
   id: string; originalName: string; mimeType: string; size: number
   url: string; altText: string | null; caption: string | null
   folderId: string | null; width: number | null; height: number | null
+  focalX: number | null; focalY: number | null
   createdAt: string
 }
 type Folder = { id: string; name: string; fileCount: number }
@@ -150,6 +151,8 @@ const detail = ref<MediaFile | null>(null)
 const detailAltText = ref('')
 const detailCaption = ref('')
 const detailFolderId = ref<string | null>(null)
+const detailFocalX = ref<number | null>(null)
+const detailFocalY = ref<number | null>(null)
 const savingDetail = ref(false)
 const deletingDetail = ref(false)
 const copied = ref(false)
@@ -176,6 +179,8 @@ function openDetail(file: MediaFile) {
   detailAltText.value = file.altText ?? ''
   detailCaption.value = file.caption ?? ''
   detailFolderId.value = file.folderId ?? null
+  detailFocalX.value = file.focalX ?? null
+  detailFocalY.value = file.focalY ?? null
   showDetail.value = true
   copied.value = false
 }
@@ -190,6 +195,8 @@ async function saveDetail() {
         altText: detailAltText.value || null,
         caption: detailCaption.value || null,
         folderId: detailFolderId.value,
+        focalX: detailFocalX.value,
+        focalY: detailFocalY.value,
       },
     })
     await refresh()
@@ -231,6 +238,23 @@ const folderOptions = computed(() => [
   { label: 'No folder', value: null },
   ...folders.value.map(f => ({ label: f.name, value: f.id })),
 ])
+
+const previewImg = ref<HTMLImageElement | null>(null)
+
+function handleImageClick(event: MouseEvent) {
+  const img = previewImg.value
+  if (!img) return
+  const rect = img.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+  detailFocalX.value = Math.round((x / rect.width) * 100)
+  detailFocalY.value = Math.round((y / rect.height) * 100)
+}
+
+function resetFocalPoint() {
+  detailFocalX.value = null
+  detailFocalY.value = null
+}
 </script>
 
 <template>
@@ -401,15 +425,25 @@ const folderOptions = computed(() => [
       <template #body>
         <div v-if="detail" class="space-y-4">
           <div class="flex gap-4">
-            <!-- Preview -->
-            <div class="w-32 h-32 shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center">
+            <!-- Preview with Focal Point Selector -->
+            <div class="relative w-48 h-48 shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center group cursor-crosshair">
               <img
                 v-if="isImage(detail.mimeType)"
+                ref="previewImg"
                 :src="detail.url"
                 :alt="detail.altText || detail.originalName"
-                class="w-full h-full object-cover"
+                class="max-h-full max-w-full object-contain pointer-events-auto"
+                @click="handleImageClick"
               >
-              <UIcon v-else name="i-lucide-file" class="w-10 h-10 text-gray-400" />
+              <!-- Focal point crosshair -->
+              <div
+                v-if="detailFocalX !== null && detailFocalY !== null"
+                class="absolute w-6 h-6 border-2 border-primary-500 rounded-full flex items-center justify-center -translate-x-1/2 -translate-y-1/2 pointer-events-none shadow"
+                :style="{ left: detailFocalX + '%', top: detailFocalY + '%' }"
+              >
+                <div class="w-1.5 h-1.5 bg-primary-500 rounded-full" />
+              </div>
+              <UIcon v-else-if="!isImage(detail.mimeType)" name="i-lucide-file" class="w-10 h-10 text-gray-400" />
             </div>
             <!-- Metadata -->
             <div class="flex-1 space-y-1 text-sm min-w-0">
@@ -427,6 +461,11 @@ const folderOptions = computed(() => [
               >
                 {{ copied ? 'Copied!' : 'Copy URL' }}
               </UButton>
+              <div v-if="isImage(detail.mimeType)" class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 px-2.5 py-1 rounded mt-2 border border-gray-100 dark:border-gray-800">
+                <span v-if="detailFocalX !== null && detailFocalY !== null">Focal Point: {{ detailFocalX }}%, {{ detailFocalY }}%</span>
+                <span v-else class="italic text-gray-400">Click preview to set focal point</span>
+                <UButton v-if="detailFocalX !== null || detailFocalY !== null" size="xs" variant="ghost" color="red" icon="i-lucide-trash-2" class="h-5 p-1" @click="resetFocalPoint" />
+              </div>
             </div>
           </div>
 

@@ -9,10 +9,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nuxflow/nuxflow/actions/workflows/ci.yml">
-    <img src="https://github.com/nuxflow/nuxflow/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  <a href="https://github.com/mattmacmillan76/NuxFlow/actions/workflows/ci.yml">
+    <img src="https://github.com/mattmacmillan76/NuxFlow/actions/workflows/ci.yml/badge.svg" alt="CI" />
   </a>
-  <a href="https://github.com/nuxflow/nuxflow/blob/main/LICENSE">
+  <a href="https://github.com/mattmacmillan76/NuxFlow/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" />
   </a>
   <img src="https://img.shields.io/badge/nuxt-4-00DC82?logo=nuxt.js" alt="Nuxt 4" />
@@ -39,14 +39,14 @@ By optimizing strictly for Cloudflare Workers instead of legacy VPS hosting or c
 
 ### Canvas Visual Page Builder
 - **Elementor-style drag-and-drop editor** — build pages visually without writing code
-- **Built-in block types**: Hero, Rich Text, Image, Video, Columns, Feature Grid, Testimonial, CTA Banner, Spacer
+- **Built-in block types**: Hero, Text, Image, Video, Columns, Features, Testimonial, CTA Banner, Spacer, GDPR Banner, Footer, Button, Accordion, Pricing Table
 - **Third-party blocks** — install dynamic plugins to add new block types (Countdown, Pricing Table, Map, etc.)
 - **State-driven editing** — every property change updates live JSON, saved with a single API call
 - **Fully server-side rendered** — canvas pages are SSR'd at the edge for instant first paint and SEO
 
 ### Rich Text Content
-- **Block editor** powered by TipTap with drag-and-drop reordering
-- **Block types**: Paragraph, Heading (H1–H6), Image, Video, Gallery, Ordered/Unordered List, Blockquote, Code, Embed, Button, Divider, Table, Custom HTML, Form embed
+- **Prose editor** powered by TipTap for rich text editing (WYSIWYG layout)
+- **Formatting options**: Paragraph, Headings (H1–H3), Bold, Italic, Underline, Strikethrough, Highlight, Inline/Block Code, Ordered/Unordered Lists, Blockquote, Divider, Images, Links, and Tables
 - **Content types**: Pages, Posts, custom types defined per site
 - **Workflow states**: Draft → Pending Review → Scheduled → Published → Archived
 - **Revision history** — point-in-time snapshots with preview and one-click restore
@@ -56,29 +56,30 @@ By optimizing strictly for Cloudflare Workers instead of legacy VPS hosting or c
 - **Content taxonomies** — tags, categories, and admin-defined custom taxonomies
 - **Multi-language** — per-item locale assignment via `@nuxtjs/i18n`
 
-### Media Management
+### Media Management & Video Streaming
 - **Drag-and-drop upload** to the media library
-- **Provider abstraction** — Cloudflare Images (default), AWS S3 / Backblaze B2, Bunny.net
-- **Alt text, caption, and focal point** editor per asset
-- **Responsive image delivery** via CDN
-- **Video streaming** via Cloudflare Stream
+- **Provider abstraction** — Cloudflare Images (default), AWS S3 / Backblaze B2, and Bunny.net (configured via environment variables)
+- **Alt text and caption** editor per asset
+- **Responsive image delivery** via Cloudflare Images variants
 - **Media picker** component embedded in the block editor
+- **Cloudflare Stream Integration** — direct browser-to-edge resumable uploads (TUS protocol), background HLS/DASH transcoding, and interactive analytics tracking
+
 
 ### Authentication & Users
 - Email/password login with secure hashing via **Better Auth**
 - **Social login** — Google and GitHub OAuth
+- **Passkey / Passwordless login** — register and authenticate with biometrics (Touch ID, Face ID) or hardware keys via WebAuthn
 - **Role-based access control**: Super Admin, Admin, Editor, Author, Viewer, plus custom roles
 - **Multi-site roles** — users can have different roles on different sites
 - Password reset via email (24-hour links)
-- **Account locking** after 5 failed attempts, auto-unlock after 30 minutes
 - User invitation workflow with role assignment
 
 ### Site Settings & SEO
 - **Per-item SEO** — meta title, description, canonical URL, Open Graph, Twitter Card, Schema.org structured data
 - **Auto-generated XML sitemap** at `/sitemap.xml`
-- **Dynamic robots.txt** — editable from the admin
+- **Dynamic robots.txt** — toggle index/noindex settings from the admin
 - **301/302 redirect manager** — create and delete redirects from the admin
-- **Analytics integration** — Google Analytics, Plausible, Fathom, Cloudflare Web Analytics
+- **Analytics integration** — setting field for Google Analytics ID (to be wired in theme templates)
 - **RSS/Atom feed** at `/feed.xml`
 
 ### Forms Builder
@@ -121,7 +122,7 @@ By optimizing strictly for Cloudflare Workers instead of legacy VPS hosting or c
 - Site creation wizard
 
 ### AI Writing Assistant
-- LLM providers: **OpenAI**, **Anthropic**, **Google Gemini**, **Ollama** (local, free)
+- LLM providers: **OpenAI**, **Anthropic**, **Google Gemini**, **DeepSeek**, **Ollama** (local, free)
 - **Improve** — select text → receive 2–3 alternative rewrites
 - **SEO suggestions** — generate meta title and description from content
 - **Alt text generation** for media uploads
@@ -142,8 +143,8 @@ By optimizing strictly for Cloudflare Workers instead of legacy VPS hosting or c
 - **Content export** — JSON or CSV download
 - **Maintenance mode** — toggle from settings; shows a customisable holding page
 - **Rate limiting** — DB-backed atomic upsert (works across Cloudflare Worker isolates)
-- **GDPR cookie consent** — configurable categories, Cloudflare geolocation-aware
-- **Comment system** — native threaded comments with auto-moderation for logged-in users
+- **GDPR cookie consent banner** — simple opt-in/opt-out consent banner for compliance
+- **Comment system** — native threaded comments with auto-approval for logged-in users and moderation queue for guests
 - Scheduled cron task — auto-publishes scheduled content every minute
 - CSRF protection, input validation (Zod), security headers
 
@@ -341,7 +342,7 @@ Unlike traditional CMS platforms built for legacy VPS servers or complex AWS inf
 
 ## Environment Variables
 
-All variables are prefixed `NUXT_` and set in `apps/nuxflow/.env` (development) or your hosting provider's secret store (production).
+Most variables are prefixed `NUXT_` (except direct provider envs like `S3_*` or `BUNNY_*`) and set in `apps/nuxflow/.env` (development) or your hosting provider's secret store (production).
 
 | Variable | Required | Description |
 |---|---|---|
@@ -360,8 +361,18 @@ All variables are prefixed `NUXT_` and set in `apps/nuxflow/.env` (development) 
 | `NUXT_CLOUDFLARE_IMAGES_TOKEN` | | Cloudflare Images API token |
 | `NUXT_CLOUDFLARE_ACCOUNT_ID` | | Cloudflare account ID |
 | `NUXT_CLOUDFLARE_IMAGES_DELIVERY_URL` | | Image delivery base URL |
+| `NUXT_CLOUDFLARE_STREAM_TOKEN` | | Cloudflare Stream API token |
 | `NUXT_PUBLIC_CLOUDFLARE_IMAGES_DELIVERY_URL` | | Same value, exposed to the client |
 | `NUXT_PUBLIC_TURNSTILE_SITE_KEY` | | Cloudflare Turnstile public site key |
+| `S3_BUCKET` | | S3 media provider — bucket name (setting this enables S3) |
+| `S3_ACCESS_KEY` | | S3 media provider — access key ID |
+| `S3_SECRET_KEY` | | S3 media provider — secret access key |
+| `S3_REGION` | | S3 media provider — region (default `us-east-1`) |
+| `S3_ENDPOINT` | | S3 media provider — custom endpoint URL (e.g. for Backblaze B2, R2) |
+| `S3_PUBLIC_URL` | | S3 media provider — public CDN/delivery URL |
+| `BUNNY_API_KEY` | | Bunny.net media provider — API key (setting this enables Bunny.net) |
+| `BUNNY_STORAGE_ZONE` | | Bunny.net media provider — storage zone name |
+| `BUNNY_PULL_ZONE` | | Bunny.net media provider — pull zone subdomain |
 | `NUXT_STRIPE_SECRET_KEY` | | Payments plugin — Stripe secret key |
 | `NUXT_STRIPE_WEBHOOK_SECRET` | | Payments plugin — Stripe webhook signing secret |
 | `NUXT_LS_API_KEY` | | Payments plugin — Lemon Squeezy API key |

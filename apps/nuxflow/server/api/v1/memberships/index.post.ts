@@ -3,6 +3,8 @@ import { membershipTiers } from '@nuxflow/db/schema'
 import { ulid } from 'ulid'
 import { useDb } from '../../../utils/db'
 import { requireRole } from '../../../utils/permissions'
+import { resolveSetting } from '../../../utils/settings'
+import { StripeProvider } from '@nuxflow/plugin-payments/providers/stripe'
 
 const bodySchema = z.object({
   name: z.string().min(1).max(100),
@@ -12,6 +14,10 @@ const bodySchema = z.object({
   interval: z.enum(['month', 'year', 'one_time']).default('month'),
   features: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
+  stripeProductId: z.string().optional(),
+  stripePriceId: z.string().optional(),
+  lsVariantId: z.string().optional(),
+  paddleProductId: z.string().optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -19,6 +25,29 @@ export default defineEventHandler(async (event) => {
   const db = useDb(event)
   const siteId = event.context.siteId as string
   const body = await readValidatedBody(event, bodySchema.parse)
+
+  let stripeProductId = body.stripeProductId
+  let stripePriceId = body.stripePriceId
+
+  // If a secret key is found and the price is greater than 0, sync to Stripe automatically if not already provided
+  if (body.price > 0 && !stripePriceId) {
+    const stripeSecretKey = await resolveSetting(event, 'payments.stripe_secret_key', 'stripeSecretKey')
+    if (stripeSecretKey) {
+      try {
+        const stripe = new StripeProvider(stripeSecretKey)
+        const product = await stripe.createProduct(body.name, body.description || undefined)
+        const price = await stripe.createPrice(product.id, body.price, body.currency, body.interval)
+        stripeProductId = product.id
+        stripePriceId = price.id
+      } catch (err) {
+        console.error('[stripe] Auto-sync failed on tier creation:', err)
+        throw createError({
+          statusCode: 400,
+          message: `Stripe synchronization failed: ${(err as Error).message}`,
+        })
+      }
+    }
+  }
 
   const id = ulid()
   await db.insert(membershipTiers).values({
@@ -31,6 +60,10 @@ export default defineEventHandler(async (event) => {
     interval: body.interval,
     features: body.features,
     isActive: body.isActive,
+    stripeProductId: stripeProductId || null,
+    stripePriceId: stripePriceId || null,
+    lsVariantId: body.lsVariantId || null,
+    paddleProductId: body.paddleProductId || null,
   })
 
   const tier = await db.query.membershipTiers.findFirst({

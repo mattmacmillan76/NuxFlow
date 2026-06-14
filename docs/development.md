@@ -41,7 +41,7 @@ Most day-to-day development happens in `apps/nuxflow` and `packages/db`. The pac
 Clone the repository and install dependencies from the repo root:
 
 ```bash
-git clone https://github.com/nuxflow/nuxflow.git
+git clone https://github.com/mattmacmillan76/NuxFlow.git
 cd nuxflow
 pnpm install
 ```

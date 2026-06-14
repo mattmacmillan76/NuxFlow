@@ -3,6 +3,8 @@ import { membershipTiers } from '@nuxflow/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { useDb } from '../../../utils/db'
 import { requireRole } from '../../../utils/permissions'
+import { resolveSetting } from '../../../utils/settings'
+import { StripeProvider } from '@nuxflow/plugin-payments/providers/stripe'
 
 const bodySchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -12,6 +14,10 @@ const bodySchema = z.object({
   interval: z.enum(['month', 'year', 'one_time']).optional(),
   features: z.array(z.string()).optional(),
   isActive: z.boolean().optional(),
+  stripeProductId: z.string().optional(),
+  stripePriceId: z.string().optional(),
+  lsVariantId: z.string().optional(),
+  paddleProductId: z.string().optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -23,12 +29,63 @@ export default defineEventHandler(async (event) => {
 
   const tier = await db.query.membershipTiers.findFirst({
     where: and(eq(membershipTiers.id, id), eq(membershipTiers.siteId, siteId)),
-    columns: { id: true },
   })
   if (!tier) throw createError({ statusCode: 404, message: 'Membership tier not found' })
 
+  let stripeProductId = body.stripeProductId !== undefined ? body.stripeProductId : tier.stripeProductId
+  let stripePriceId = body.stripePriceId !== undefined ? body.stripePriceId : tier.stripePriceId
+
+  // Determine target price, currency, interval, name, description
+  const targetPrice = body.price !== undefined ? body.price : tier.price
+  const targetCurrency = body.currency !== undefined ? body.currency : tier.currency
+  const targetInterval = body.interval !== undefined ? body.interval : tier.interval
+  const targetName = body.name !== undefined ? body.name : tier.name
+  const targetDescription = body.description !== undefined ? body.description : (tier.description ?? undefined)
+
+  // Auto-sync/create if Stripe is configured and it's a paid tier
+  if (targetPrice > 0) {
+    const stripeSecretKey = await resolveSetting(event, 'payments.stripe_secret_key', 'stripeSecretKey')
+    if (stripeSecretKey) {
+      try {
+        const stripe = new StripeProvider(stripeSecretKey)
+        if (!stripeProductId) {
+          // No product exists. Create both product and price
+          const product = await stripe.createProduct(targetName, targetDescription)
+          const price = await stripe.createPrice(product.id, targetPrice, targetCurrency, targetInterval)
+          stripeProductId = product.id
+          stripePriceId = price.id
+        } else {
+          // Product exists. If name or description is updated, update product metadata on Stripe
+          if (body.name !== undefined || body.description !== undefined) {
+            await stripe.updateProduct(stripeProductId, targetName, targetDescription)
+          }
+
+          // If price, currency, or interval changed (or if no stripePriceId exists yet), create a new price
+          const priceChanged = body.price !== undefined && body.price !== tier.price
+          const currencyChanged = body.currency !== undefined && body.currency !== tier.currency
+          const intervalChanged = body.interval !== undefined && body.interval !== tier.interval
+          if (priceChanged || currencyChanged || intervalChanged || !stripePriceId) {
+            const price = await stripe.createPrice(stripeProductId, targetPrice, targetCurrency, targetInterval)
+            stripePriceId = price.id
+          }
+        }
+      } catch (err) {
+        console.error('[stripe] Auto-sync failed on tier update:', err)
+        throw createError({
+          statusCode: 400,
+          message: `Stripe synchronization failed: ${(err as Error).message}`,
+        })
+      }
+    }
+  }
+
   await db.update(membershipTiers)
-    .set({ ...body, updatedAt: new Date().toISOString() })
+    .set({
+      ...body,
+      stripeProductId: stripeProductId || null,
+      stripePriceId: stripePriceId || null,
+      updatedAt: new Date().toISOString(),
+    })
     .where(and(eq(membershipTiers.id, id), eq(membershipTiers.siteId, siteId)))
 
   const updated = await db.query.membershipTiers.findFirst({

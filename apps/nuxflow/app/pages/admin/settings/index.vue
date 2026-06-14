@@ -14,6 +14,7 @@ const tabs = [
   { label: 'General', icon: 'i-lucide-settings' },
   { label: 'Appearance', icon: 'i-lucide-palette' },
   { label: 'Email', icon: 'i-lucide-mail' },
+  { label: 'Payments', icon: 'i-lucide-credit-card' },
   { label: 'Integrations', icon: 'i-lucide-plug' },
   { label: 'AI Settings', icon: 'i-lucide-bot' },
   { label: 'Push', icon: 'i-lucide-bell' },
@@ -142,6 +143,17 @@ async function sendTestEmail() {
 // ── Integrations ─────────────────────────────────────────────────────────────
 const integrations = reactive({ turnstileSiteKey: '', analyticsId: '' })
 
+const payments = reactive({
+  stripeSecretKey: '',
+  stripeWebhookSecret: '',
+  lsApiKey: '',
+  lsStoreId: '',
+  lsWebhookSecret: '',
+  paddleApiKey: '',
+  paddleVendorId: '',
+  paddleWebhookPublicKey: '',
+})
+
 const ai = reactive({
   provider: 'openai',
   openaiApiKey: '',
@@ -259,6 +271,15 @@ watch(data, (d) => {
   appearance.showColorToggle = (s['frontend.show_color_toggle'] as boolean | undefined) !== false
   appearance.faviconUrl = (s['appearance.favicon_url'] as string) ?? ''
 
+  payments.stripeSecretKey = (s['payments.stripe_secret_key'] as string) ?? ''
+  payments.stripeWebhookSecret = (s['payments.stripe_webhook_secret'] as string) ?? ''
+  payments.lsApiKey = (s['payments.ls_api_key'] as string) ?? ''
+  payments.lsStoreId = (s['payments.ls_store_id'] as string) ?? ''
+  payments.lsWebhookSecret = (s['payments.ls_webhook_secret'] as string) ?? ''
+  payments.paddleApiKey = (s['payments.paddle_api_key'] as string) ?? ''
+  payments.paddleVendorId = (s['payments.paddle_vendor_id'] as string) ?? ''
+  payments.paddleWebhookPublicKey = (s['payments.paddle_webhook_public_key'] as string) ?? ''
+
   ai.provider = (s['ai.provider'] as string) ?? 'openai'
   ai.openaiApiKey = (s['ai.openai_api_key'] as string) ?? ''
   ai.anthropicApiKey = (s['ai.anthropic_api_key'] as string) ?? ''
@@ -298,6 +319,14 @@ async function save() {
       'push.events.content_published': push.eventsContentPublished ? 'true' : 'false',
       'push.events.payment_confirmation': push.eventsPaymentConfirmation ? 'true' : 'false',
       'push.events.form_submission': push.eventsFormSubmission ? 'true' : 'false',
+      'payments.stripe_secret_key': payments.stripeSecretKey,
+      'payments.stripe_webhook_secret': payments.stripeWebhookSecret,
+      'payments.ls_api_key': payments.lsApiKey,
+      'payments.ls_store_id': payments.lsStoreId,
+      'payments.ls_webhook_secret': payments.lsWebhookSecret,
+      'payments.paddle_api_key': payments.paddleApiKey,
+      'payments.paddle_vendor_id': payments.paddleVendorId,
+      'payments.paddle_webhook_public_key': payments.paddleWebhookPublicKey,
     }
     await $fetch('/api/v1/settings', {
       method: 'PATCH',
@@ -633,6 +662,100 @@ async function deleteSite() {
                   {{ emailTestResult.message }}
                 </p>
               </div>
+            </div>
+            <template #footer>
+              <div class="flex justify-end">
+                <UButton :loading="saving" @click="save">Save changes</UButton>
+              </div>
+            </template>
+          </UCard>
+        </template>
+
+        <!-- Payments -->
+        <template v-if="active === 'Payments'">
+          <UCard>
+            <template #header><p class="text-sm font-semibold text-gray-900 dark:text-white">Payment gateway settings</p></template>
+            <div class="space-y-6">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                Configure payment gateways for paid membership subscriptions. Enabling Stripe allows automated syncing of membership tiers.
+              </p>
+
+              <!-- Stripe settings -->
+              <div class="space-y-4">
+                <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
+                  <UIcon name="i-lucide-credit-card" class="w-5 h-5 text-primary-500" />
+                  <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Stripe</h3>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <UFormField label="Stripe Secret Key">
+                    <UInput v-model="payments.stripeSecretKey" type="password" placeholder="sk_live_..." class="w-full" />
+                  </UFormField>
+                  <UFormField label="Stripe Webhook Secret">
+                    <UInput v-model="payments.stripeWebhookSecret" type="password" placeholder="whsec_..." class="w-full" />
+                  </UFormField>
+                </div>
+                <p class="text-xs text-gray-400">
+                  To automatically update subscriptions, add a webhook in Stripe dashboard pointing to: 
+                  <code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded font-mono break-all select-all">
+                    https://{{ general.domain || 'yourdomain.com' }}/api/v1/memberships/webhooks/stripe
+                  </code>
+                </p>
+              </div>
+
+              <!-- Lemon Squeezy settings -->
+              <div class="space-y-4 pt-2">
+                <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
+                  <UIcon name="i-lucide-wallet" class="w-5 h-5 text-primary-500" />
+                  <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Lemon Squeezy</h3>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <UFormField label="Lemon Squeezy API Key">
+                    <UInput v-model="payments.lsApiKey" type="password" placeholder="eyJ..." class="w-full" />
+                  </UFormField>
+                  <UFormField label="Lemon Squeezy Webhook Secret">
+                    <UInput v-model="payments.lsWebhookSecret" type="password" placeholder="Secret..." class="w-full" />
+                  </UFormField>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <UFormField label="Lemon Squeezy Store ID">
+                    <UInput v-model="payments.lsStoreId" placeholder="e.g. 12345" class="w-full" />
+                  </UFormField>
+                </div>
+                <p class="text-xs text-gray-400">
+                  Webhook URL for Lemon Squeezy dashboard: 
+                  <code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded font-mono break-all select-all">
+                    https://{{ general.domain || 'yourdomain.com' }}/api/v1/memberships/webhooks/lemonsqueezy
+                  </code>
+                </p>
+              </div>
+
+              <!-- Paddle settings -->
+              <div class="space-y-4 pt-2">
+                <div class="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
+                  <UIcon name="i-lucide-credit-card" class="w-5 h-5 text-primary-500" />
+                  <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Paddle</h3>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <UFormField label="Paddle API Key">
+                    <UInput v-model="payments.paddleApiKey" type="password" placeholder="Live_..." class="w-full" />
+                  </UFormField>
+                  <UFormField label="Paddle Webhook Public Key" hint="Paddle sends webhook signatures signed using a public/private keypair">
+                    <UTextarea v-model="payments.paddleWebhookPublicKey" placeholder="-----BEGIN PUBLIC KEY-----..." class="w-full font-mono text-xs" :rows="3" />
+                  </UFormField>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <UFormField label="Paddle Vendor/Merchant ID">
+                    <UInput v-model="payments.paddleVendorId" placeholder="e.g. 98765" class="w-full" />
+                  </UFormField>
+                </div>
+                <p class="text-xs text-gray-400">
+                  Webhook URL for Paddle dashboard: 
+                  <code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded font-mono break-all select-all">
+                    https://{{ general.domain || 'yourdomain.com' }}/api/v1/memberships/webhooks/paddle
+                  </code>
+                </p>
+              </div>
+
             </div>
             <template #footer>
               <div class="flex justify-end">

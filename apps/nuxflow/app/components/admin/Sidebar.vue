@@ -16,6 +16,7 @@ const coreNav = [
   { label: 'Comments', to: '/admin/comments', icon: 'i-lucide-message-circle' },
   { label: 'Navigation', to: '/admin/menus', icon: 'i-lucide-navigation' },
   { label: 'Media', to: '/admin/media', icon: 'i-lucide-image' },
+  { label: 'Videos', to: '/admin/media/videos', icon: 'i-lucide-video' },
   { label: 'Forms', to: '/admin/forms', icon: 'i-lucide-list-checks' },
   { label: 'Contact Forms', to: '/admin/contact-forms', icon: 'i-lucide-mail' },
   { label: 'Users', to: '/admin/users', icon: 'i-lucide-users' },

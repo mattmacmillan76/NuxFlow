@@ -15,6 +15,20 @@
       "when": 1781183115652,
       "tag": "0001_simple_sprite",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1781289566164,
+      "tag": "0002_loose_kitty_pryde",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1781290476377,
+      "tag": "0003_regular_changeling",
+      "breakpoints": true
     }
   ]
 }

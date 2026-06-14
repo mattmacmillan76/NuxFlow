@@ -1,5 +1,72 @@
 # @nuxflow/db
 
+## 2.0.0-beta.1
+
+### Minor Changes
+
+- bd1d5bd: Add web push notifications (VAPID) for real-time in-app alerts.
+
+  **Server**
+  - `server/utils/webpush.ts`: full VAPID implementation using Web Crypto API (no Node.js dependencies) — key generation, subscription management, and RFC 8291 encrypted payload delivery.
+  - `server/api/v1/push/`: eight new endpoints: `vapid-public-key.get`, `vapid-keys.post` (generate/rotate keys), `subscribe.post`, `unsubscribe.delete`, `status.get`, `subscribers.get`, `broadcast.post`, `test.post`.
+  - `server/utils/notify.ts`: `sendNotification()` now broadcasts a web push alongside the in-app notification when the site has VAPID keys configured.
+  - `server/utils/settings.ts`: add `push.vapid_public_key` and `push.vapid_private_key` to `SENSITIVE_SETTING_KEYS` for encrypted-at-rest storage.
+  - Push triggers wired into `contact/submit.post.ts`, `content/[id].patch.ts`, and `memberships/webhooks/[provider].post.ts`.
+
+  **Frontend**
+  - `app/composables/usePushNotifications.ts`: composable that wraps the Push API, handles permission requests, subscribes/unsubscribes, and tracks state.
+  - `app/components/public/PushNotificationBanner.vue`: opt-in banner rendered on public pages.
+  - `app/layouts/default.vue`: mount the banner in the default layout.
+  - `app/pages/account.vue`: push notification toggle in the user account settings.
+  - `app/pages/admin/settings/index.vue`: VAPID key management and broadcast UI in Admin → Settings → Notifications.
+  - `public/sw.js`: service worker that handles `push` events and renders notifications via the Notifications API.
+
+  **Database**
+  - `packages/db/src/schema/system.ts`: new `push_subscriptions` table (`id`, `siteId`, `userId`, `endpoint`, `p256dh`, `auth`, `createdAt`).
+  - Migration `0001_simple_sprite.sql`: `CREATE TABLE push_subscriptions` applied automatically on next deploy.
+
+- 058ca48: Add Cloudflare Stream video support, membership tier management, canvas block improvements, and wrangler dev build automation.
+
+  **Cloudflare Stream / video**
+  - `app/pages/admin/media/videos.vue`: dedicated Videos tab in the media library with TUS resumable upload support.
+  - `server/api/v1/media/video/`: new video API endpoints for upload URL generation, list, and delete via the Cloudflare Stream API.
+  - `packages/db/src/schema/media.ts`: add `videoAssets` table for tracking Stream-hosted videos.
+  - Migrations `0002` and `0003`: schema additions applied automatically on next deploy.
+
+  **Membership / billing**
+  - `server/api/v1/memberships/index.post.ts`: create membership tiers with Stripe product and price creation.
+  - `server/api/v1/memberships/[id].patch.ts`: update tier metadata and sync changes to Stripe.
+  - `server/api/v1/memberships/checkout.post.ts`: Stripe Checkout session creation with configurable success/cancel URLs.
+  - `server/api/v1/memberships/billing-portal.post.ts`: Stripe Customer Portal session creation.
+  - `server/api/v1/memberships/webhooks/[provider].post.ts`: full Stripe webhook handling for subscription lifecycle events.
+  - `packages/plugins/payments/src/providers/stripe.ts`: shared Stripe client helpers.
+  - `packages/plugins/payments/src/components/MembershipsAdmin.vue`: tier CRUD UI with Stripe sync status.
+  - `packages/plugins/payments/src/components/Paywall.vue`: subscription-aware paywall with portal link.
+
+  **Canvas blocks**
+  - `CanvasBlockGdpr.vue`: complete overhaul — consent state machine, cookie categories, granular accept/reject controls.
+  - `CanvasBlockImage.vue`: lazy loading, aspect-ratio preservation, and Cloudflare Images URL transformation.
+  - `CanvasBlockVideo.vue`: Stream iframe embed with poster and autoplay controls.
+  - `definitions.ts`: updated block schemas for GDPR, image, and video blocks.
+  - `themes/default/components/blocks/Image.vue`: matching image block improvements in the default theme.
+
+  **Content editor**
+  - `ContentEditor.client.vue`: image insertion from the media library, link editing, and table support.
+
+  **Admin UI**
+  - `app/pages/admin/settings/index.vue`: expanded settings page with Stream, Stripe, and email provider sections.
+  - `app/components/admin/Sidebar.vue`: Videos link in the media section.
+  - `app/pages/admin/media/index.vue`: media library layout and filter improvements.
+
+  **Tests**
+  - New integration test suite: `billing-portal`, `checkout`, `media-patch`, `memberships-tiers`, `video-assets`, `webhooks`.
+  - New unit test: `canvas-blocks.test.ts` covering all block definition schemas.
+  - Test helpers (`event.ts`, `globals.ts`, `seed.ts`): expanded fixtures for membership and media scenarios.
+
+  **Developer experience**
+  - `wrangler.toml` / `wrangler.toml.example`: add `[build] command = "pnpm run build"` so `wrangler dev` compiles the Nuxt app automatically on first run — no separate build step required.
+  - `docs/installation.md`: document the auto-build behaviour and note that source changes require a restart.
+
 ## 2.0.0-beta.0
 
 ### Patch Changes

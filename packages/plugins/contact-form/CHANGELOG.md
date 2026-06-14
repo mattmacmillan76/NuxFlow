@@ -1,5 +1,13 @@
 # @nuxflow/plugin-contact-form
 
+## 2.0.0-beta.1
+
+### Patch Changes
+
+- Updated dependencies [058ca48]
+  - @nuxflow/plugin-canvas@2.0.0-beta.1
+  - @nuxflow/plugin-sdk@2.0.0-beta.1
+
 ## 2.0.0-beta.0
 
 ### Patch Changes

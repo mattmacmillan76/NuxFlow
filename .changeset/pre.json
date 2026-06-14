@@ -16,8 +16,11 @@
     "canvas-admin-ui-simplification",
     "feat-ai-suite",
     "feat-membership-auth-pages-and-test-suite",
+    "feat-push-notifications",
     "feat-social-login-and-security",
+    "feat-stream-video-memberships-and-canvas",
     "fix-lint-and-kysely",
+    "fix-multi-domain-oauth",
     "fix-ssr-setup-onboarding",
     "security-enhancements-and-new-canvas-blocks"
   ]

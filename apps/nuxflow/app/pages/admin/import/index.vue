@@ -27,12 +27,12 @@ async function downloadBackup() {
 // ── Restore ───────────────────────────────────────────────────────────────────
 const restoreFile = ref<File | null>(null)
 const restoreWhat = ref(['content', 'taxonomies', 'menus', 'forms'])
-const restoreConflict = ref<'skip' | 'overwrite'>('skip')
+const restoreConflict = ref<'skip' | 'overwrite' | 'archive'>('skip')
 const restoring = ref(false)
 const restoreResult = ref<{
   result: {
     site: { updated: boolean }
-    content: { created: number; skipped: number }
+    content: { created: number; updated: number; skipped: number }
     taxonomies: { created: number }
     terms: { created: number }
     menus: { created: number }
@@ -261,6 +261,21 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
             {{ item }}
           </div>
         </div>
+
+        <UAlert
+          icon="i-lucide-shield-alert"
+          color="warning"
+          variant="soft"
+        >
+          <template #title>
+            <span class="font-semibold">Contains live credentials — treat it like a password</span>
+          </template>
+          <template #description>
+            <span class="text-gray-800 dark:text-gray-200">
+              "Site settings" includes decrypted API keys and secrets (Stripe, email/AI providers, OAuth client secrets, etc.), stored in plain text inside the .zip so they can be restored on a differently-configured deployment. Store this file securely and never send it over an unencrypted channel.
+            </span>
+          </template>
+        </UAlert>
       </div>
 
       <template #footer>
@@ -321,7 +336,7 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
         </UFormField>
 
         <UFormField label="Conflict handling" hint="What to do when a slug already exists">
-          <div class="flex gap-4">
+          <div class="flex flex-wrap gap-4">
             <label class="flex items-center gap-2 text-sm cursor-pointer text-gray-700 dark:text-gray-300">
               <input v-model="restoreConflict" type="radio" value="skip" class="text-primary-500">
               Skip (keep existing)
@@ -329,6 +344,10 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
             <label class="flex items-center gap-2 text-sm cursor-pointer text-gray-700 dark:text-gray-300">
               <input v-model="restoreConflict" type="radio" value="overwrite" class="text-primary-500">
               Overwrite
+            </label>
+            <label class="flex items-center gap-2 text-sm cursor-pointer text-gray-700 dark:text-gray-300">
+              <input v-model="restoreConflict" type="radio" value="archive" class="text-primary-500">
+              Archive existing (keep both)
             </label>
           </div>
         </UFormField>
@@ -345,7 +364,7 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
           <template #description>
             <ul class="text-sm space-y-0.5 mt-1">
               <li v-if="restoreResult.result.site.updated">Site info: updated</li>
-              <li>Content: {{ restoreResult.result.content.created }} created, {{ restoreResult.result.content.skipped }} skipped</li>
+              <li>Content: {{ restoreResult.result.content.created }} created<span v-if="restoreResult.result.content.updated">, {{ restoreResult.result.content.updated }} updated</span>, {{ restoreResult.result.content.skipped }} skipped</li>
               <li>Taxonomies: {{ restoreResult.result.taxonomies.created }} created, {{ restoreResult.result.terms.created }} terms</li>
               <li>Menus: {{ restoreResult.result.menus.created }} created</li>
               <li>Forms: {{ restoreResult.result.forms.created }} created</li>

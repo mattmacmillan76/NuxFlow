@@ -3,11 +3,12 @@ import { buildBackup } from '../../utils/backup'
 import { zipSync } from 'fflate'
 import { isSafeUrl, safeFetch } from '../../utils/security'
 import { isHttpError } from '../../utils/errors'
+import { writeAuditLog } from '../../utils/audit'
 
 const MAX_RAW_IMAGE_BYTES = 100 * 1024 * 1024 // 100 MB uncompressed
 
 export default defineEventHandler(async (event) => {
-  await requireRole(event, 'admin')
+  const { userId } = await requireRole(event, 'admin')
   const siteId = event.context.siteId as string
 
   const backup = await buildBackup(event, siteId)
@@ -50,6 +51,11 @@ export default defineEventHandler(async (event) => {
 
   // level 1 = fast compression; images are already compressed formats, so little gain from higher levels
   const zipBytes = zipSync(zipFiles, { level: 1 })
+
+  // The export always contains every site setting decrypted to plaintext (API keys,
+  // OAuth secrets, etc. — see buildBackup) — worth its own audit trail entry distinct
+  // from ordinary reads, since downloading one is effectively exporting live credentials.
+  await writeAuditLog(event, userId, { action: 'export', resource: 'site', resourceId: siteId })
 
   const filename = `nuxflow-backup-${new Date().toISOString().slice(0, 10)}.zip`
   setHeader(event, 'Content-Type', 'application/zip')

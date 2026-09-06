@@ -298,12 +298,32 @@ export interface RestoreOptions {
 
 export interface RestoreResult {
   site: { updated: boolean }
-  content: { created: number; skipped: number }
+  content: { created: number; updated: number; skipped: number }
   taxonomies: { created: number }
   terms: { created: number }
   menus: { created: number }
   forms: { created: number }
   settings: { updated: number }
+}
+
+// Replaces a content item's taxonomy-term assignments with the ones from the backup.
+// Used for both freshly-inserted items and 'overwrite'-mode updates — the delete is a
+// no-op for a brand-new id, but is what makes overwrite actually reapply the backup's
+// termSlugs instead of leaving whatever assignments (or lack of them) already existed.
+async function replaceContentTerms(
+  db: ReturnType<typeof useDb>,
+  itemId: string,
+  termSlugs: string[] | undefined,
+  termIdBySlugPath: Map<string, string>,
+): Promise<void> {
+  await db.delete(contentTaxonomyTerms).where(eq(contentTaxonomyTerms.contentItemId, itemId))
+  if (!termSlugs?.length) return
+  const termIds = termSlugs
+    .map(s => termIdBySlugPath.get(s))
+    .filter((t): t is string => t !== undefined)
+  if (termIds.length > 0) {
+    await db.insert(contentTaxonomyTerms).values(termIds.map(termId => ({ contentItemId: itemId, termId })))
+  }
 }
 
 // ── Restore (apply backup to a site) ─────────────────────────────────────────
@@ -317,7 +337,7 @@ export async function applyBackup(
   const db = useDb(event)
   const result: RestoreResult = {
     site: { updated: false },
-    content: { created: 0, skipped: 0 },
+    content: { created: 0, updated: 0, skipped: 0 },
     taxonomies: { created: 0 },
     terms: { created: 0 },
     menus: { created: 0 },
@@ -487,7 +507,11 @@ export async function applyBackup(
             settings: backupItem.settings ?? undefined,
             locale: backupItem.locale || 'en',
           }).where(eq(contentItems.id, existing.id))
-          result.content.created++
+          // Reapply the backup's term assignments too — without this, overwriting an
+          // existing item would update its fields but silently keep whatever
+          // categories/tags it already had (or lacked), ignoring backupItem.termSlugs.
+          await replaceContentTerms(db, existing.id, backupItem.termSlugs, termIdBySlugPath)
+          result.content.updated++
           continue
         } else {
           result.content.skipped++
@@ -513,15 +537,7 @@ export async function applyBackup(
         locale: backupItem.locale || 'en',
       })
 
-      // Assign terms
-      if (backupItem.termSlugs?.length > 0) {
-        const termIds = backupItem.termSlugs
-          .map(s => termIdBySlugPath.get(s))
-          .filter((t): t is string => t !== undefined)
-        if (termIds.length > 0) {
-          await db.insert(contentTaxonomyTerms).values(termIds.map(termId => ({ contentItemId: id, termId })))
-        }
-      }
+      await replaceContentTerms(db, id, backupItem.termSlugs, termIdBySlugPath)
 
       result.content.created++
     }

@@ -7,26 +7,10 @@ import { and, eq } from 'drizzle-orm'
 import { ulid } from 'ulid'
 import { isSafeUrl, safeFetch } from '../../../utils/security'
 import { errorMessage } from '../../../utils/errors'
+import { htmlToTipTap } from '../../../utils/html-to-tiptap'
+import { parseWxr } from '../../../utils/wxr-parser'
 
 const MAX_WXR_BYTES = 100 * 1024 * 1024 // 100 MB — WXR exports for large sites can be tens of MB
-
-interface WpItem {
-  title: string
-  slug: string
-  status: string
-  postType: string
-  content: string
-  excerpt: string
-  publishedAt: string | null
-  categories: string[]
-  tags: string[]
-}
-
-interface WpAttachment {
-  title: string
-  slug: string
-  url: string
-}
 
 type ImportEvent =
   | { type: 'parsed'; items: number; images: number }
@@ -35,89 +19,6 @@ type ImportEvent =
   | { type: 'content'; done: number; total: number }
   | { type: 'done'; imported: number; skipped: number; categories: number; tags: number; mediaUploaded: number; mediaFailed: number }
   | { type: 'error'; message: string }
-
-function parseWxr(xml: string): { items: WpItem[]; attachments: WpAttachment[]; categories: Map<string, string>; tags: Map<string, string> } {
-  const items: WpItem[] = []
-  const attachments: WpAttachment[] = []
-  const categories = new Map<string, string>()
-  const tags = new Map<string, string>()
-
-  const catRegex = /<wp:category>[\s\S]*?<wp:category_nicename><!\[CDATA\[(.*?)\]\]><\/wp:category_nicename>[\s\S]*?<wp:cat_name><!\[CDATA\[(.*?)\]\]><\/wp:cat_name>[\s\S]*?<\/wp:category>/g
-  for (const m of xml.matchAll(catRegex)) {
-    categories.set(m[1]!, m[2]!)
-  }
-
-  const tagRegex = /<wp:tag>[\s\S]*?<wp:tag_slug><!\[CDATA\[(.*?)\]\]><\/wp:tag_slug>[\s\S]*?<wp:tag_name><!\[CDATA\[(.*?)\]\]><\/wp:tag_name>[\s\S]*?<\/wp:tag>/g
-  for (const m of xml.matchAll(tagRegex)) {
-    tags.set(m[1]!, m[2]!)
-  }
-
-  const itemRegex = /<item>([\s\S]*?)<\/item>/g
-  for (const itemMatch of xml.matchAll(itemRegex)) {
-    const block = itemMatch[1]!
-    const postType = cdataOrTag(block, 'wp:post_type') ?? 'post'
-
-    if (postType === 'attachment') {
-      const title = cdataOrTag(block, 'title') ?? ''
-      const slug = cdataOrTag(block, 'wp:post_name') ?? slugify(title)
-      const url = cdataOrTag(block, 'wp:attachment_url')
-      if (url) attachments.push({ title, slug, url })
-      continue
-    }
-
-    if (postType !== 'post' && postType !== 'page') continue
-
-    const title = cdataOrTag(block, 'title') ?? ''
-    const slug = cdataOrTag(block, 'wp:post_name') ?? slugify(title)
-    const rawStatus = cdataOrTag(block, 'wp:status') ?? 'draft'
-    const status = rawStatus === 'publish' ? 'published' : 'draft'
-    const content = cdataOrTag(block, 'content:encoded') ?? ''
-    const excerpt = cdataOrTag(block, 'excerpt:encoded') ?? ''
-    const pubDate = cdataOrTag(block, 'wp:post_date_gmt') ?? null
-
-    const itemCats: string[] = []
-    const itemTags: string[] = []
-    const termRegex = /<category domain="(category|post_tag)" nicename="([^"]+)"/g
-    for (const tm of block.matchAll(termRegex)) {
-      if (tm[1] === 'category') itemCats.push(tm[2]!)
-      else itemTags.push(tm[2]!)
-    }
-
-    items.push({ title, slug, status, postType, content, excerpt, publishedAt: pubDate, categories: itemCats, tags: itemTags })
-  }
-
-  return { items, attachments, categories, tags }
-}
-
-// cdataOrTag is called several times per item during WXR parsing; caching the compiled
-// regex per tag name avoids recompiling the same pattern on every call across every item.
-const cdataOrTagRegexCache = new Map<string, { cdataRe: RegExp; plainRe: RegExp }>()
-
-function cdataOrTag(block: string, tag: string): string | null {
-  let pair = cdataOrTagRegexCache.get(tag)
-  if (!pair) {
-    pair = {
-      cdataRe: new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`),
-      plainRe: new RegExp(`<${tag}[^>]*>([^<]*)<\\/${tag}>`),
-    }
-    cdataOrTagRegexCache.set(tag, pair)
-  }
-  const cm = block.match(pair.cdataRe)
-  if (cm) return cm[1]!.trim()
-  const pm = block.match(pair.plainRe)
-  return pm ? pm[1]!.trim() : null
-}
-
-function slugify(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || ulid().toLowerCase()
-}
-
-function wpContentToTipTap(html: string): object {
-  return {
-    type: 'doc',
-    content: [{ type: 'paragraph', content: [{ type: 'text', text: html }] }],
-  }
-}
 
 export default defineEventHandler(async (event) => {
   const { userId } = await requireRole(event, 'admin')
@@ -242,14 +143,26 @@ export default defineEventHandler(async (event) => {
       }
 
       const catTermMap = new Map<string, string>()
-      for (const [slug, name] of categories) {
+      for (const [slug, cat] of categories) {
         const existing = await db.query.taxonomyTerms.findFirst({
           where: and(eq(taxonomyTerms.taxonomyId, catTaxonomy.id), eq(taxonomyTerms.slug, slug)),
         })
         if (existing) { catTermMap.set(slug, existing.id); continue }
         const id = ulid()
-        await db.insert(taxonomyTerms).values({ id, taxonomyId: catTaxonomy.id, slug, name })
+        await db.insert(taxonomyTerms).values({ id, taxonomyId: catTaxonomy.id, slug, name: cat.name })
         catTermMap.set(slug, id)
+      }
+
+      // Second pass: wire parent categories now that every category has an id — WXR's
+      // wp:category_parent references the parent by nicename/slug, so this can't be done
+      // in the same pass as the insert loop above (the parent might not exist yet).
+      for (const [slug, cat] of categories) {
+        if (!cat.parentSlug) continue
+        const childId = catTermMap.get(slug)
+        const parentId = catTermMap.get(cat.parentSlug)
+        if (childId && parentId) {
+          await db.update(taxonomyTerms).set({ parentId }).where(eq(taxonomyTerms.id, childId))
+        }
       }
 
       const tagTermMap = new Map<string, string>()
@@ -261,6 +174,15 @@ export default defineEventHandler(async (event) => {
         const id = ulid()
         await db.insert(taxonomyTerms).values({ id, taxonomyId: tagTaxonomy.id, slug, name })
         tagTermMap.set(slug, id)
+      }
+
+      // Attachment wp:post_id -> its (already-rewritten, if uploaded) local URL — used to
+      // resolve each post's featured image (wp:postmeta _thumbnail_id references an
+      // attachment by post id, not by URL).
+      const attachmentUrlByPostId = new Map<string, string>()
+      for (const att of attachments) {
+        if (!att.postId) continue
+        attachmentUrlByPostId.set(att.postId, urlMap.get(att.url) ?? att.url)
       }
 
       await push({ type: 'content_start', total: items.length })
@@ -284,15 +206,19 @@ export default defineEventHandler(async (event) => {
           content = content.replaceAll(remoteUrl, localUrl)
         }
 
+        const ogImage = item.featuredImageId ? (attachmentUrlByPostId.get(item.featuredImageId) ?? null) : null
+
         await db.insert(contentItems).values({
           id: itemId,
           siteId,
           typeId,
+          authorId: userId,
           slug: item.slug,
           title: item.title || '(Untitled)',
           status: item.status as 'draft' | 'published',
-          content: wpContentToTipTap(content),
+          content: htmlToTipTap(content),
           excerpt: item.excerpt || null,
+          ogImage,
           publishedAt: item.publishedAt,
         })
 

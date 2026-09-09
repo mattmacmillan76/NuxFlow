@@ -32,6 +32,7 @@
     "feat-per-site-social-login-and-auth-unification",
     "feat-pre-release-security-and-architecture-audit",
     "feat-push-notifications",
+    "feat-role-permissions-audit-and-admin-ui",
     "feat-self-service-site-deletion",
     "feat-seo-fields-and-structured-data",
     "feat-sms-scaffold",

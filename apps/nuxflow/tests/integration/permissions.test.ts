@@ -11,6 +11,7 @@ vi.mock('../../server/utils/db', () => ({
 }))
 
 const SITE = 'site-perms-01'
+const OTHER_SITE = 'site-perms-02'
 
 let adminUserId: string
 let editorUserId: string
@@ -22,6 +23,7 @@ beforeAll(async () => {
   const db = getCurrentTestDb()
 
   await seedSite(db, { id: SITE, domain: 'perms.localhost' })
+  await seedSite(db, { id: OTHER_SITE, domain: 'perms2.localhost' })
 
   adminUserId = await seedUser(db, { name: 'Admin', email: 'admin@perms.test' })
   editorUserId = await seedUser(db, { name: 'Editor', email: 'editor@perms.test' })
@@ -30,7 +32,10 @@ beforeAll(async () => {
 
   await seedRole(db, adminUserId, SITE, 'admin')
   await seedRole(db, editorUserId, SITE, 'editor')
-  // noRoleUserId has no role row — should default to 'viewer'
+  // noRoleUserId has no role row on either site — should now be rejected outright,
+  // not silently downgraded to 'viewer' (see the comment in permissions.ts).
+  // superAdminUserId has a super_admin row on SITE only — deliberately has no row
+  // on OTHER_SITE, to exercise the preserved cross-site "still gets viewer" fallback.
   await seedRole(db, superAdminUserId, SITE, 'super_admin')
 })
 
@@ -72,10 +77,25 @@ describe('requireAuth', () => {
     expect(result.role).toBe('admin')
   })
 
-  it('defaults to viewer when no role row exists for the user', async () => {
+  it('rejects a user with no role row on this site, even though they have an account', async () => {
+    // User accounts are global across this multi-tenant install and login has no
+    // site-membership check, so this must reject outright rather than silently
+    // grant baseline 'viewer' access to a site this user was never invited to.
     const event = createMockEvent({
       siteId: SITE,
       session: { user: { id: noRoleUserId, name: 'Norole', email: 'norole@perms.test' } },
+    })
+
+    await expect(requireAuth(event as unknown as H3Event)).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  it('still grants a super admin viewer-level access to a site they have no local role on', async () => {
+    // Preserves the documented cross-site model: super admin access to another
+    // site's admin panel is automatic, but effective role for content operations
+    // there stays 'viewer' unless a real user_site_roles row exists.
+    const event = createMockEvent({
+      siteId: OTHER_SITE,
+      session: { user: { id: superAdminUserId, name: 'Super', email: 'super@perms.test' } },
     })
 
     const result = await requireAuth(event as unknown as H3Event)

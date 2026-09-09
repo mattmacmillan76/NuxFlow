@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { generateText } from 'ai'
-import { requireAuth } from '../../../utils/permissions'
+import { requireRole } from '../../../utils/permissions'
 import { requireAiSdkModel, callAiOrThrow } from '../../../utils/ai-sdk'
 import { useDb } from '../../../utils/db'
 import { getMediaByIdOrThrow } from '../../../utils/resource-queries'
@@ -10,7 +10,7 @@ const bodySchema = z.object({ mediaId: z.string() })
 const SYSTEM = `You are an accessibility expert. Write concise, descriptive alt text for an image. Return ONLY the alt text string, no quotes, no explanation.`
 
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  await requireRole(event, 'editor')
   const model = await requireAiSdkModel(event, 'fast')
 
   const { mediaId } = await parseBody(event, bodySchema)

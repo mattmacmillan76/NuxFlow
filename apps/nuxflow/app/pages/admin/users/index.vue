@@ -1,11 +1,13 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: ['auth'] })
 
-type UserRow = { id: string; name: string; email: string; role: string; createdAt: string }
+type UserRow = { id: string; name: string; email: string; role: string; createdAt: string; pending: boolean }
 const { data, refresh } = await useFetch<{ users: UserRow[] }>('/api/v1/users')
 const users = computed(() => data.value?.users ?? [])
 
 const { user: currentUser } = useUserSession()
+const access = await fetchAdminAccess()
+const isSuperAdmin = computed(() => access?.isSuperAdmin ?? false)
 
 const showInvite = ref(false)
 const inviteForm = reactive({ name: '', email: '', role: 'viewer' as string })
@@ -13,6 +15,9 @@ const inviting = ref(false)
 const inviteError = ref('')
 
 const removingId = ref<string | null>(null)
+const resendingId = ref<string | null>(null)
+const superAdminActionId = ref<string | null>(null)
+const actionError = ref('')
 
 async function removeUser(userId: string) {
   if (!confirm('Remove this user from the site?')) return
@@ -22,6 +27,46 @@ async function removeUser(userId: string) {
     await refresh()
   } finally {
     removingId.value = null
+  }
+}
+
+async function resendInvite(userId: string) {
+  resendingId.value = userId
+  actionError.value = ''
+  try {
+    await $fetch(`/api/v1/users/${userId}/resend-invite`, { method: 'POST' })
+  } catch (e: unknown) {
+    actionError.value = (e as { data?: { message?: string } })?.data?.message ?? 'Failed to resend invite'
+  } finally {
+    resendingId.value = null
+  }
+}
+
+async function promoteSuperAdmin(userId: string) {
+  if (!confirm('Grant this user super admin access? They will be able to manage every site in this NuxFlow instance.')) return
+  superAdminActionId.value = userId
+  actionError.value = ''
+  try {
+    await $fetch(`/api/v1/users/${userId}/super-admin`, { method: 'POST' })
+    await refresh()
+  } catch (e: unknown) {
+    actionError.value = (e as { data?: { message?: string } })?.data?.message ?? 'Failed to grant super admin'
+  } finally {
+    superAdminActionId.value = null
+  }
+}
+
+async function revokeSuperAdmin(userId: string) {
+  if (!confirm('Revoke super admin access for this user? They will be downgraded to admin on this site.')) return
+  superAdminActionId.value = userId
+  actionError.value = ''
+  try {
+    await $fetch(`/api/v1/users/${userId}/super-admin`, { method: 'DELETE' })
+    await refresh()
+  } catch (e: unknown) {
+    actionError.value = (e as { data?: { message?: string } })?.data?.message ?? 'Failed to revoke super admin'
+  } finally {
+    superAdminActionId.value = null
   }
 }
 
@@ -77,6 +122,7 @@ const columns = [
           <div class="flex items-center gap-3">
             <UAvatar :alt="row.original.name" size="sm" />
             <span class="font-medium text-gray-900 dark:text-white">{{ row.original.name }}</span>
+            <UBadge v-if="row.original.pending" color="warning" variant="subtle" size="xs">Pending</UBadge>
           </div>
         </template>
 
@@ -90,7 +136,8 @@ const columns = [
             :items="roleOptions"
             size="xs"
             class="min-w-28"
-            :disabled="row.original.role === 'super_admin'"
+            :disabled="row.original.role === 'super_admin' || row.original.id === currentUser?.id"
+            :title="row.original.id === currentUser?.id ? 'You cannot change your own role' : undefined"
             @update:model-value="(val) => updateRole(row.original.id, val as string)"
           />
         </template>
@@ -100,7 +147,40 @@ const columns = [
         </template>
 
         <template #actions-cell="{ row }">
-          <div class="flex justify-end">
+          <div class="flex justify-end items-center gap-1">
+            <UButton
+              v-if="row.original.pending"
+              icon="i-lucide-mail"
+              variant="ghost"
+              size="xs"
+              title="Resend invite email"
+              :loading="resendingId === row.original.id"
+              @click="resendInvite(row.original.id)"
+            />
+
+            <template v-if="isSuperAdmin && row.original.id !== currentUser?.id">
+              <UButton
+                v-if="row.original.role !== 'super_admin'"
+                icon="i-lucide-shield-plus"
+                variant="ghost"
+                color="warning"
+                size="xs"
+                title="Grant super admin"
+                :loading="superAdminActionId === row.original.id"
+                @click="promoteSuperAdmin(row.original.id)"
+              />
+              <UButton
+                v-else
+                icon="i-lucide-shield-minus"
+                variant="ghost"
+                color="warning"
+                size="xs"
+                title="Revoke super admin (downgrades to admin)"
+                :loading="superAdminActionId === row.original.id"
+                @click="revokeSuperAdmin(row.original.id)"
+              />
+            </template>
+
             <UButton
               v-if="row.original.role !== 'super_admin' && row.original.id !== currentUser?.id"
               icon="i-lucide-trash-2"
@@ -114,6 +194,8 @@ const columns = [
         </template>
       </UTable>
     </UCard>
+
+    <UAlert v-if="actionError" icon="i-lucide-circle-x" color="error" variant="soft" :description="actionError" />
 
     <UModal v-model:open="showInvite" title="Invite user">
       <template #body>

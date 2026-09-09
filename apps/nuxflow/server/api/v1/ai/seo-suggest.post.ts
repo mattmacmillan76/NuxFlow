@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { generateText } from 'ai'
-import { requireAuth } from '../../../utils/permissions'
+import { requireRole } from '../../../utils/permissions'
 import { requireAiSdkModel, callAiOrThrow } from '../../../utils/ai-sdk'
 
 const bodySchema = z.object({
@@ -11,7 +11,7 @@ const bodySchema = z.object({
 const SYSTEM = `You are an SEO expert. Return ONLY valid JSON with keys "title" (max 60 chars) and "description" (max 160 chars). No other text.`
 
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  await requireRole(event, 'editor')
   const model = await requireAiSdkModel(event, 'fast')
 
   const { title, body } = await parseBody(event, bodySchema)

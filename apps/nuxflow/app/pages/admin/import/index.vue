@@ -38,6 +38,8 @@ const restoreResult = ref<{
     menus: { created: number }
     forms: { created: number }
     settings: { updated: number }
+    themes: { created: number; updated: number; skipped: number }
+    plugins: { created: number; updated: number; skipped: number; rejected: number }
   }
   media: { uploaded: number; skipped: number }
 } | null>(null)
@@ -50,6 +52,8 @@ const restoreWhatOptions = [
   { value: 'forms', label: 'Forms' },
   { value: 'settings', label: 'Site settings' },
   { value: 'site', label: 'Site info (name, locale, timezone)' },
+  { value: 'themes', label: 'Themes (CSS)' },
+  { value: 'plugins', label: 'Dynamic plugins (code)' },
 ]
 
 function onRestoreFile(e: Event) {
@@ -256,7 +260,7 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
         </UAlert>
 
         <div class="grid grid-cols-2 gap-3 text-sm">
-          <div v-for="item in ['Content & pages', 'Categories & tags', 'Menus', 'Forms', 'Site settings', 'Content types', 'Media files']" :key="item" class="flex items-center gap-2 text-gray-800 dark:text-gray-200 font-medium">
+          <div v-for="item in ['Content & pages', 'Categories & tags', 'Menus', 'Forms', 'Site settings', 'Content types', 'Media files', 'Themes (CSS)', 'Dynamic plugins (code)']" :key="item" class="flex items-center gap-2 text-gray-800 dark:text-gray-200 font-medium">
             <UIcon name="i-lucide-check" class="w-4 h-4 text-green-500 shrink-0" />
             {{ item }}
           </div>
@@ -369,6 +373,12 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
               <li>Menus: {{ restoreResult.result.menus.created }} created</li>
               <li>Forms: {{ restoreResult.result.forms.created }} created</li>
               <li v-if="restoreResult.result.settings.updated">Settings: {{ restoreResult.result.settings.updated }} updated</li>
+              <li v-if="restoreResult.result.themes.created || restoreResult.result.themes.updated || restoreResult.result.themes.skipped">
+                Themes: {{ restoreResult.result.themes.created }} created<span v-if="restoreResult.result.themes.updated">, {{ restoreResult.result.themes.updated }} updated</span><span v-if="restoreResult.result.themes.skipped">, {{ restoreResult.result.themes.skipped }} skipped</span> (installed inactive — activate from Admin → Themes)
+              </li>
+              <li v-if="restoreResult.result.plugins.created || restoreResult.result.plugins.updated || restoreResult.result.plugins.skipped || restoreResult.result.plugins.rejected">
+                Plugins: {{ restoreResult.result.plugins.created }} created<span v-if="restoreResult.result.plugins.updated">, {{ restoreResult.result.plugins.updated }} updated</span><span v-if="restoreResult.result.plugins.skipped">, {{ restoreResult.result.plugins.skipped }} skipped</span><span v-if="restoreResult.result.plugins.rejected" class="text-orange-500">, {{ restoreResult.result.plugins.rejected }} rejected (signature/checksum mismatch)</span> (installed inactive — activate from Admin → Plugins)
+              </li>
               <li v-if="restoreResult.media.uploaded">Media: {{ restoreResult.media.uploaded }} images uploaded<span v-if="restoreResult.media.skipped">, {{ restoreResult.media.skipped }} skipped</span></li>
             </ul>
           </template>

@@ -5,28 +5,14 @@ const emit = defineEmits<{ toggleCollapse: [] }>()
 const auth = useAuthStore()
 const route = useRoute()
 
-const { data: me } = await useFetch<{ role: string; isSuperAdmin: boolean }>('/api/v1/users/me')
-const isSuperAdmin = computed(() => me.value?.isSuperAdmin ?? false)
+const access = await fetchAdminAccess()
+const isSuperAdmin = computed(() => access?.isSuperAdmin ?? false)
 
-const coreNav = [
-  { label: 'Dashboard', to: '/admin', icon: 'i-lucide-layout-dashboard' },
-  { label: 'Content', to: '/admin/content', icon: 'i-lucide-file-text' },
-  { label: 'Calendar', to: '/admin/calendar', icon: 'i-lucide-calendar-days' },
-  { label: 'Taxonomies', to: '/admin/taxonomies', icon: 'i-lucide-tag' },
-  { label: 'Comments', to: '/admin/comments', icon: 'i-lucide-message-circle' },
-  { label: 'Navigation', to: '/admin/menus', icon: 'i-lucide-navigation' },
-  { label: 'Media', to: '/admin/media', icon: 'i-lucide-image' },
-  { label: 'Videos', to: '/admin/media/videos', icon: 'i-lucide-video' },
-  { label: 'Forms', to: '/admin/forms', icon: 'i-lucide-list-checks' },
-  { label: 'Contact Forms', to: '/admin/contact-forms', icon: 'i-lucide-mail' },
-  { label: 'Users', to: '/admin/users', icon: 'i-lucide-users' },
-  { label: 'Memberships', to: '/admin/memberships', icon: 'i-lucide-credit-card' },
-  { label: 'Themes', to: '/admin/themes', icon: 'i-lucide-palette' },
-  { label: 'Plugins', to: '/admin/plugins', icon: 'i-lucide-puzzle' },
-  { label: 'SEO', to: '/admin/seo', icon: 'i-lucide-search' },
-  { label: 'Import', to: '/admin/import', icon: 'i-lucide-upload' },
-  { label: 'Settings', to: '/admin/settings', icon: 'i-lucide-settings' },
-]
+// Filtered against the same rule table admin-role-guard.global.ts enforces server-side
+// navigation against — see app/utils/admin-nav.ts. A user only ever sees links to
+// sections their role can actually use.
+const coreNav = computed(() => ADMIN_NAV.filter(item => canAccessNavItem(item, access)))
+const superAdminNav = computed(() => SUPER_ADMIN_NAV.filter(item => canAccessNavItem(item, access)))
 
 function isActive(to: string) {
   return route.path === to || (to !== '/admin' && route.path.startsWith(to))
@@ -75,21 +61,23 @@ function isActive(to: string) {
       </NuxtLink>
 
       <!-- Super admin section -->
-      <template v-if="isSuperAdmin">
+      <template v-if="isSuperAdmin && superAdminNav.length">
         <div v-if="!collapsed" class="px-3 pt-4 pb-1">
           <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Super Admin</p>
         </div>
         <NuxtLink
-          to="/admin/super/sites"
-          :title="collapsed ? 'Sites' : undefined"
+          v-for="item in superAdminNav"
+          :key="item.to"
+          :to="item.to"
+          :title="collapsed ? item.label : undefined"
           class="flex items-center gap-3 py-2 rounded-xl text-sm font-medium transition-colors"
           :class="[
-            isActive('/admin/super/sites') ? 'nav-active' : 'text-gray-600 hover:bg-black/5 dark:text-gray-400 dark:hover:bg-white/5',
+            isActive(item.to) ? 'nav-active' : 'text-gray-600 hover:bg-black/5 dark:text-gray-400 dark:hover:bg-white/5',
             collapsed ? 'justify-center px-2' : 'px-3',
           ]"
         >
-          <UIcon name="i-lucide-globe" class="w-4 h-4 shrink-0" />
-          <span v-if="!collapsed">Sites</span>
+          <UIcon :name="item.icon" class="w-4 h-4 shrink-0" />
+          <span v-if="!collapsed">{{ item.label }}</span>
         </NuxtLink>
       </template>
     </nav>

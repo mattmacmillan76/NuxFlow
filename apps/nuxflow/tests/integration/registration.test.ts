@@ -25,6 +25,13 @@ vi.mock('../../server/utils/rate-limit', () => ({
   rateLimit: vi.fn().mockResolvedValue(undefined),
 }))
 
+const mockSendVerificationEmail = vi.fn().mockResolvedValue(undefined)
+vi.mock('../../server/utils/better-auth', () => ({
+  getOrCreateBetterAuth: async () => ({
+    api: { sendVerificationEmail: mockSendVerificationEmail },
+  }),
+}))
+
 const SITE = 'site-reg-01'
 let existingUserId!: string
 
@@ -121,6 +128,12 @@ describe('POST /api/public/auth/register', () => {
         where: eq(userSiteRoles.userId, user!.id),
       })
       expect(role?.role).toBe('member')
+
+      // Self-registration has no other proof of email ownership (unlike the invite
+      // flow's emailed password-reset link) — best-effort verification email trigger.
+      expect(mockSendVerificationEmail).toHaveBeenCalledWith({
+        body: { email, callbackURL: '/login?verified=1' },
+      })
     })
 
     it('throws 422 when email is already registered', async () => {

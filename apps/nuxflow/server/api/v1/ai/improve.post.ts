@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { generateText } from 'ai'
-import { requireAuth } from '../../../utils/permissions'
+import { requireRole } from '../../../utils/permissions'
 import { requireAiSdkModel, callAiOrThrow } from '../../../utils/ai-sdk'
 import { rateLimit } from '../../../utils/rate-limit'
 
@@ -12,7 +12,7 @@ const bodySchema = z.object({
 const SYSTEM = `You are a helpful writing assistant. Return ONLY a JSON array of 3 improved alternatives, no other text. Example: ["Alt 1", "Alt 2", "Alt 3"]`
 
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  await requireRole(event, 'editor')
   await rateLimit(event, { limit: 20, windowMs: 60_000, keyPrefix: 'ai' })
 
   const model = await requireAiSdkModel(event, 'fast')

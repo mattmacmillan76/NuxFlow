@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { generateObject } from 'ai'
-import { requireAuth } from '../../../utils/permissions'
+import { requireRole } from '../../../utils/permissions'
 import { requireAiSdkModel, callAiOrThrow } from '../../../utils/ai-sdk'
 import { rateLimit } from '../../../utils/rate-limit'
 
@@ -26,7 +26,7 @@ For each issue found:
 Only flag genuine issues. Return an empty corrections array if the text is already well-written.`
 
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  await requireRole(event, 'editor')
   await rateLimit(event, { limit: 15, windowMs: 60_000, keyPrefix: 'ai-grammar' })
 
   const model = await requireAiSdkModel(event, 'fast')

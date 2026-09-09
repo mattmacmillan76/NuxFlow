@@ -16,6 +16,7 @@ const schema = z.object({
 const form = reactive({ email: '', password: '', rememberMe: true })
 const loading = ref(false)
 const error = ref('')
+const verified = ref(false)
 
 const SOCIAL_ERROR_MESSAGES: Record<string, string> = {
   'account_not_linked': 'This Google/GitHub account isn\'t linked to any NuxFlow account. Sign in with your email and password first, then go to Settings → Security to connect your social account.',
@@ -27,6 +28,9 @@ onMounted(() => {
   const queryError = route.query.error as string | undefined
   if (queryError) {
     error.value = SOCIAL_ERROR_MESSAGES[queryError] ?? `Sign-in error: ${queryError}`
+  }
+  if (route.query.verified === '1') {
+    verified.value = true
   }
 })
 
@@ -98,6 +102,7 @@ async function signInSocial(provider: 'google' | 'github') {
         <NuxtLink to="/forgot-password" class="text-xs text-primary-500 hover:underline">Forgot password?</NuxtLink>
       </div>
 
+      <UAlert v-if="verified" color="success" variant="soft" description="Email verified — you can sign in now." />
       <UAlert v-if="error" color="error" variant="soft" :description="error" />
 
       <div class="flex flex-col gap-2">

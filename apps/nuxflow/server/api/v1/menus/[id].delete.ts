@@ -1,5 +1,5 @@
 import { useDb } from '../../../utils/db'
-import { requireAuth } from '../../../utils/permissions'
+import { requireRole } from '../../../utils/permissions'
 import { buildAuditLogInsert, batchWithAudit } from '../../../utils/audit'
 import { getMenuByIdOrThrow } from '../../../utils/resource-queries'
 import { menus } from '@nuxflow/db/schema'
@@ -8,7 +8,7 @@ import { purgeEdgeCache, purgeAllPublicPages } from '../../../utils/edge-cache'
 import { waitUntil } from '../../../utils/cf-env'
 
 export default defineEventHandler(async (event) => {
-  const { userId } = await requireAuth(event)
+  const { userId } = await requireRole(event, 'editor')
   const db = useDb(event)
   const siteId = event.context.siteId as string
   const id = getRouterParam(event, 'id')!

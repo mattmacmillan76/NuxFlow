@@ -37,3 +37,13 @@ export function useDb(event?: H3Event): Db {
   // caller-facing guarantee (throw above if absent) is the actual safety check.
   return drizzle(d1 as D1Database, { schema })
 }
+
+// Raw D1Database binding, bypassing Drizzle — for code that needs direct SQL access
+// Drizzle's query builder doesn't expose (schema introspection via sqlite_master/PRAGMA,
+// e.g. the whole-database SQL export in d1-export.ts). Shares useDb()'s binding
+// resolution (event context, then the scheduled-task globalThis fallback) rather than
+// duplicating it.
+export function getD1(event?: H3Event): D1Database {
+  useDb(event) // populates _d1 via the resolution chain above; throws the same clear error if unbound
+  return _d1 as D1Database
+}

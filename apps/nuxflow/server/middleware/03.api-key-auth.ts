@@ -33,10 +33,19 @@ export default defineEventHandler(async (event) => {
   // Update last used
   void db.update(apiKeys).set({ lastUsedAt: new Date().toISOString() }).where(eq(apiKeys.id, apiKey.id))
 
-  // Resolve role for this site
+  // Resolve role for this site. Deleting a user's userSiteRoles row (removing them
+  // from the site) does not cascade-delete their API keys — those live on until
+  // explicitly revoked — so a missing row here means access was revoked after the
+  // key was issued, not "give them a default role". Every consumer of these context
+  // fields (content/index.get.ts, public pages preview, mcp.ts) treats apiKeyUserId's
+  // mere presence as "this is an authenticated request", so leaving both unset makes
+  // a revoked key behave exactly like an unrecognized one instead of a residual
+  // 'viewer'.
   const roleRow = await db.query.userSiteRoles.findFirst({
     where: and(eq(userSiteRoles.userId, apiKey.userId), eq(userSiteRoles.siteId, siteId)),
   })
+  if (!roleRow) return
+
   event.context.apiKeyUserId = apiKey.userId
-  event.context.apiKeyRole = roleRow?.role ?? 'viewer'
+  event.context.apiKeyRole = roleRow.role
 })

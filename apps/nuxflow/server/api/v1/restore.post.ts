@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
 
   const what = query.what.split(',').filter(
     (w): w is RestoreOptions['what'][number] =>
-      ['content', 'taxonomies', 'menus', 'forms', 'settings', 'site'].includes(w),
+      ['content', 'taxonomies', 'menus', 'forms', 'settings', 'site', 'themes', 'plugins'].includes(w),
   )
 
   const formData = await readMultipartFormData(event)

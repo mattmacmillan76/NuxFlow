@@ -11,8 +11,13 @@ export default defineEventHandler(async (event) => {
     hasSuperAdminRole(db, session.user.id),
   ])
 
+  // Mirrors requireAuth()'s access model (see permissions.ts): a real per-site role
+  // wins, a super admin still reports a baseline 'viewer' with no local row (matches
+  // their documented cross-site access), and anyone else genuinely has no access to
+  // this site — reported as null rather than a fabricated 'viewer' that would
+  // overstate what they can actually do.
   return {
-    role: siteRole?.role ?? 'viewer',
+    role: siteRole?.role ?? (isSuperAdmin ? 'viewer' : null),
     isSuperAdmin,
   }
 })

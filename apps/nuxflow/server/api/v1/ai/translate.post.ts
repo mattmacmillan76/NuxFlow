@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { generateText } from 'ai'
-import { requireAuth } from '../../../utils/permissions'
+import { requireRole } from '../../../utils/permissions'
 import { requireAiSdkModel, callAiOrThrow } from '../../../utils/ai-sdk'
 import { rateLimit } from '../../../utils/rate-limit'
 import { useDb } from '../../../utils/db'
@@ -118,7 +118,7 @@ function applyToBlock(block: CanvasBlockLike, translations: Record<string, strin
 }
 
 export default defineEventHandler(async (event) => {
-  const { userId } = await requireAuth(event)
+  const { userId } = await requireRole(event, 'editor')
   await rateLimit(event, { limit: 5, windowMs: 60_000, keyPrefix: 'ai-translate' })
 
   const model = await requireAiSdkModel(event, 'smart')

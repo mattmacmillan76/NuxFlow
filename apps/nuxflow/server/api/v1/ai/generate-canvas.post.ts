@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { generateObject } from 'ai'
 import { ulid } from 'ulid'
-import { requireAuth } from '../../../utils/permissions'
+import { requireRole } from '../../../utils/permissions'
 import { requireAiSdkModel, callAiOrThrow } from '../../../utils/ai-sdk'
 import { rateLimit } from '../../../utils/rate-limit'
 
@@ -101,7 +101,7 @@ Rules:
 - All text should be compelling and match the requested tone`
 
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  await requireRole(event, 'editor')
   await rateLimit(event, { limit: 10, windowMs: 60_000, keyPrefix: 'ai-canvas' })
 
   const model = await requireAiSdkModel(event, 'smart')

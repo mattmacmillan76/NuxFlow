@@ -258,7 +258,10 @@ describe('03.api-key-auth middleware', () => {
     expect(ctx.apiKeyRole).toBe('editor')
   })
 
-  it('defaults apiKeyRole to viewer when the user has no site role row', async () => {
+  it('treats a key as invalid when its owner has no (or no longer has a) site role row', async () => {
+    // Simulates a user removed from the site (DELETE /api/v1/users/:id only deletes
+    // their userSiteRoles row, not their API keys) — the key itself is still found
+    // and unexpired, but must not fall back to a residual 'viewer' grant.
     const noRoleUser = await seedUser(getCurrentTestDb(), { email: 'norole@middleware.test' })
     const noRoleKey = 'nf_norole_key_xyz789'
     const noRoleHash = await sha256Hex(noRoleKey)
@@ -276,8 +279,8 @@ describe('03.api-key-auth middleware', () => {
     const event = mkApiKeyEvent({ authorization: `Bearer ${noRoleKey}` })
     await (apiKeyMiddleware as MiddlewareFn)(event)
     const ctx = (event as unknown as { context: Record<string, unknown> }).context
-    expect(ctx.apiKeyUserId).toBe(noRoleUser)
-    expect(ctx.apiKeyRole).toBe('viewer')
+    expect(ctx.apiKeyUserId).toBeUndefined()
+    expect(ctx.apiKeyRole).toBeUndefined()
   })
 
   it('skips when the key is expired', async () => {

@@ -107,6 +107,31 @@ async function buildBetterAuthInstance(event: H3Event) {
     fallback: primaryUrl,
   }
 
+  // Shared by sendResetPassword and sendVerificationEmail below — both need the same
+  // "resolve the site for this email link's host, then decrypt its email-provider
+  // settings" lookup, previously only written once for sendResetPassword.
+  async function resolveSiteEmailSettings(host: string): Promise<{ siteId: string; sm: Record<string, string> } | null> {
+    const site = await db.query.sites.findFirst({ where: eq(schema.sites.domain, host) })
+    if (!site) return null
+    const settingRows = await db.query.siteSettings.findMany({
+      where: and(eq(schema.siteSettings.siteId, site.id)),
+    })
+    const rc = useRuntimeConfig()
+    const secret = rc.betterAuthSecret
+    const sm: Record<string, string> = {}
+    for (const row of settingRows) {
+      if (!row.value) continue
+      if (SENSITIVE_SETTING_KEYS.has(row.key)) {
+        try { sm[row.key] = await decryptText(row.value as string, secret) }
+        catch { sm[row.key] = row.value as string }
+      }
+      else {
+        sm[row.key] = row.value as string
+      }
+    }
+    return { siteId: site.id, sm }
+  }
+
   return betterAuth({
     baseURL,
     secret: config.betterAuthSecret,
@@ -149,27 +174,12 @@ async function buildBetterAuthInstance(event: H3Event) {
         let host = 'localhost'
         try { host = new URL(resetUrl).hostname } catch { /* keep default */ }
         try {
-          const site = await db.query.sites.findFirst({ where: eq(schema.sites.domain, host) })
-          if (!site) {
+          const resolved = await resolveSiteEmailSettings(host)
+          if (!resolved) {
             console.warn('[auth] sendResetPassword: no site found for host', host)
             return
           }
-          const settingRows = await db.query.siteSettings.findMany({
-            where: and(eq(schema.siteSettings.siteId, site.id)),
-          })
-          const rc = useRuntimeConfig()
-          const secret = rc.betterAuthSecret
-          const sm: Record<string, string> = {}
-          for (const row of settingRows) {
-            if (!row.value) continue
-            if (SENSITIVE_SETTING_KEYS.has(row.key)) {
-              try { sm[row.key] = await decryptText(row.value as string, secret) }
-              catch { sm[row.key] = row.value as string }
-            }
-            else {
-              sm[row.key] = row.value as string
-            }
-          }
+          const { sm } = resolved
           await sendEmailWithConfig(
             {
               emailProvider: sm['email.provider'] || 'console',
@@ -192,6 +202,52 @@ async function buildBetterAuthInstance(event: H3Event) {
           console.error('[auth] sendResetPassword email failed:', err)
         }
       },
+    },
+    // Sending is wired up (used explicitly by server/api/public/auth/register.post.ts
+    // right after it creates a self-registered account) but nothing enforces it —
+    // emailAndPassword above has no requireEmailVerification flag. Every existing row
+    // in every existing NuxFlow deployment has emailVerified=false (there was never a
+    // way to set it true before this), so flipping on a hard login block would lock out
+    // every current user, including site admins, the moment this ships. sendOnSignUp is
+    // deliberately omitted too: it would fire through auth.api.signUpEmail(), which is
+    // also what server/api/v1/users/index.post.ts uses to create a brand-new invitee's
+    // account — that route already sends its own "set your password" email right after,
+    // and a second "verify your email" email pointing at a login they can't use yet
+    // would recreate the exact dead-end that invite flow's own comments call out.
+    emailVerification: {
+      sendVerificationEmail: async ({ user, url: verifyUrl }) => {
+        let host = 'localhost'
+        try { host = new URL(verifyUrl).hostname } catch { /* keep default */ }
+        try {
+          const resolved = await resolveSiteEmailSettings(host)
+          if (!resolved) {
+            console.warn('[auth] sendVerificationEmail: no site found for host', host)
+            return
+          }
+          const { sm } = resolved
+          await sendEmailWithConfig(
+            {
+              emailProvider: sm['email.provider'] || 'console',
+              fromAddress: sm['email.from_address'] || `noreply@${host}`,
+              resendApiKey: sm['email.resend_api_key'],
+              brevoApiKey: sm['email.brevo_api_key'],
+              zeptoApiKey: sm['email.zepto_api_key'],
+              domain: host,
+            },
+            {
+              to: user.email,
+              subject: 'Verify your email address',
+              html: `<p>Hi ${escapeHtml(user.name)},</p><p>Click the link below to verify your email address.</p><p><a href="${verifyUrl}" style="display:inline-block;padding:12px 24px;background:#10b981;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;">Verify email</a></p><p style="color:#6b7280;font-size:14px;">If you did not create this account, you can safely ignore this email.</p>`,
+              text: `Hi ${user.name},\n\nVerify your email address:\n${verifyUrl}\n\nIf you did not create this account, ignore this email.`,
+            },
+            event,
+          )
+        }
+        catch (err) {
+          console.error('[auth] sendVerificationEmail failed:', err)
+        }
+      },
+      autoSignInAfterVerification: true,
     },
     // Better Auth's own rate limiter defaults to in-memory storage, which doesn't
     // persist across Cloudflare Worker isolates. Rate limiting for sign-in/sign-up/

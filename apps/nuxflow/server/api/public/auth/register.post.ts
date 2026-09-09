@@ -5,6 +5,7 @@ import { nuxflowPasswordHasher } from '../../../utils/pw'
 import { useDb } from '../../../utils/db'
 import { resolveSetting } from '../../../utils/settings'
 import { rateLimit } from '../../../utils/rate-limit'
+import { getOrCreateBetterAuth } from '../../../utils/better-auth'
 import { ulid } from 'ulid'
 
 const bodySchema = z.object({
@@ -69,6 +70,21 @@ export default defineEventHandler(async (event) => {
   await db.insert(userSiteRoles)
     .values({ id: ulid(), userId, siteId, role: 'member' })
     .onConflictDoNothing()
+
+  // Unlike the invite flow (which proves email ownership via a real emailed
+  // password-reset link the invitee must click), self-registration has no such proof
+  // today — the account is created directly from an unauthenticated form POST with no
+  // verification step at all. auth.api.sendVerificationEmail() is a direct in-process
+  // call (not a self-fetch), so it doesn't hit the Workers self-fetch timeout that
+  // ruled out calling Better Auth's own sign-up endpoint above. Best-effort: a failure
+  // here shouldn't fail registration itself, since login isn't blocked on verification
+  // (see the comment on emailVerification in better-auth.ts for why).
+  try {
+    const auth = await getOrCreateBetterAuth(event)
+    await auth.api.sendVerificationEmail({ body: { email, callbackURL: '/login?verified=1' } })
+  } catch (err) {
+    console.error('[register] Failed to send verification email:', err)
+  }
 
   return { success: true }
 })

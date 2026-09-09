@@ -5,6 +5,7 @@ import {
   contentTypes, contentItems,
   taxonomies, taxonomyTerms, contentTaxonomyTerms,
   menus, forms, media,
+  themes, dynamicPlugins, dynamicPluginTrust,
 } from '@nuxflow/db/schema'
 import type { FormField, ConditionalLogic } from '@nuxflow/db/schema'
 import { and, eq, inArray } from 'drizzle-orm'
@@ -12,6 +13,11 @@ import { ulid } from 'ulid'
 import { saveSetting, SENSITIVE_SETTING_KEYS } from './settings'
 import { clearBetterAuthCache } from './better-auth'
 import { decryptText } from './encryption'
+import {
+  getThemeCSS, putThemeCSS, getThemeDemo, putThemeDemo,
+  getPluginServerCode, putPluginServerCode, getPluginClientBundle, putPluginClientBundle,
+} from './cf-env'
+import { verifyPluginSignature, computeSha256 } from './plugin-signing'
 
 // ── Backup format types ───────────────────────────────────────────────────────
 
@@ -86,6 +92,43 @@ export interface BackupMediaItem {
   zipPath: string | null  // relative path inside the backup zip; null = not bundled
 }
 
+// Theme CSS and the customizer's generated CSS live only in KV (see cf-env.ts /
+// putThemeCSS) — never mirrored to D1 — so a D1-only backup can restore every page but
+// not a site's actual look. `css`/`demo` are the raw KV payloads, captured here so the
+// backup is self-contained even if the KV namespace is later lost or wiped.
+export interface BackupTheme {
+  packageName: string
+  name: string
+  version: string
+  isActive: boolean
+  hasCss: boolean
+  settings: Record<string, unknown> | null
+  css: string | null
+  demo: string | null
+}
+
+// `pluginId` mirrors dynamicPlugins.id, which (unlike every other table here) is the
+// publisher-assigned manifest id, not a generated ulid — it's both the KV key segment
+// and the primary key, so it's the natural restore-matching key. serverCode/clientBundle
+// are the raw KV code payloads; signature/checksums travel alongside them so a restore
+// can re-verify them exactly as the install endpoint does, rather than trusting a
+// user-editable backup.json to carry unmodified code.
+export interface BackupDynamicPlugin {
+  pluginId: string
+  name: string
+  version: string
+  description: string
+  isActive: boolean
+  hasServer: boolean
+  hasClient: boolean
+  serverChecksum: string | null
+  clientChecksum: string | null
+  publisherPublicKey: string
+  signature: string
+  serverCode: string | null
+  clientBundle: string | null
+}
+
 export interface NuxFlowBackup {
   version: '1'
   exportedAt: string
@@ -101,6 +144,8 @@ export interface NuxFlowBackup {
   menus: BackupMenu[]
   forms: BackupForm[]
   media: BackupMediaItem[]
+  themes: BackupTheme[]
+  plugins: BackupDynamicPlugin[]
 }
 
 // Replaces all occurrences of old image URLs with new ones throughout the backup JSON.
@@ -123,7 +168,7 @@ export function rewriteImageUrls(backup: NuxFlowBackup, urlMap: Map<string, stri
 export async function buildBackup(event: H3Event, siteId: string): Promise<NuxFlowBackup> {
   const db = useDb(event)
 
-  const [site, settingRows, ctRows, itemRows, taxRows, menuRows, formRows, mediaRows] = await Promise.all([
+  const [site, settingRows, ctRows, itemRows, taxRows, menuRows, formRows, mediaRows, themeRows, pluginRows] = await Promise.all([
     db.query.sites.findFirst({
       where: eq(sites.id, siteId),
       columns: { name: true, locale: true, timezone: true },
@@ -151,7 +196,46 @@ export async function buildBackup(event: H3Event, siteId: string): Promise<NuxFl
       where: eq(media.siteId, siteId),
       columns: { id: true, originalName: true, mimeType: true, size: true, width: true, height: true, url: true, altText: true, caption: true },
     }),
+    db.query.themes.findMany({ where: eq(themes.siteId, siteId) }),
+    db.query.dynamicPlugins.findMany({ where: eq(dynamicPlugins.siteId, siteId) }),
   ])
+
+  // Themes: D1 row plus its KV-only CSS/demo payload (see BackupTheme). getThemeCSS()
+  // is reused here rather than a raw kv.get() so a legacy pre-versioning CSS key still
+  // gets picked up, and the value comes back already sanitized.
+  const backupThemes: BackupTheme[] = []
+  for (const t of themeRows) {
+    backupThemes.push({
+      packageName: t.packageName,
+      name: t.name,
+      version: t.version,
+      isActive: t.isActive,
+      hasCss: t.hasCss,
+      settings: t.settings ?? null,
+      css: t.hasCss ? await getThemeCSS(event, siteId, t.id, t.cssVersion) : null,
+      demo: await getThemeDemo(event, siteId, t.id),
+    })
+  }
+
+  // Dynamic plugins: D1 row plus its KV-only server/client code (see BackupDynamicPlugin).
+  const backupPlugins: BackupDynamicPlugin[] = []
+  for (const p of pluginRows) {
+    backupPlugins.push({
+      pluginId: p.id,
+      name: p.name,
+      version: p.version,
+      description: p.description,
+      isActive: p.isActive,
+      hasServer: p.hasServer,
+      hasClient: p.hasClient,
+      serverChecksum: p.serverChecksum,
+      clientChecksum: p.clientChecksum,
+      publisherPublicKey: p.publisherPublicKey,
+      signature: p.signature,
+      serverCode: p.hasServer ? await getPluginServerCode(event, siteId, p.id) : null,
+      clientBundle: p.hasClient ? await getPluginClientBundle(event, siteId, p.id) : null,
+    })
+  }
 
   // Build type slug lookup
   const typeSlugById = new Map(ctRows.map(t => [t.id, t.slug]))
@@ -280,6 +364,8 @@ export async function buildBackup(event: H3Event, siteId: string): Promise<NuxFl
       url: m.url,
       zipPath: null as string | null,
     })),
+    themes: backupThemes,
+    plugins: backupPlugins,
   }
 }
 
@@ -292,7 +378,7 @@ export interface RestoreOptions {
   // 'site' in the `what` it passes to applyBackup(), so importing a theme's demo content
   // can never overwrite the live site's name/locale/timezone. Only the real restore route
   // (restore.post.ts) opts into 'site'.
-  what: ('content' | 'settings' | 'menus' | 'taxonomies' | 'forms' | 'site')[]
+  what: ('content' | 'settings' | 'menus' | 'taxonomies' | 'forms' | 'site' | 'themes' | 'plugins')[]
   conflictMode: 'skip' | 'overwrite' | 'archive'
 }
 
@@ -304,6 +390,8 @@ export interface RestoreResult {
   menus: { created: number }
   forms: { created: number }
   settings: { updated: number }
+  themes: { created: number; updated: number; skipped: number }
+  plugins: { created: number; updated: number; skipped: number; rejected: number }
 }
 
 // Replaces a content item's taxonomy-term assignments with the ones from the backup.
@@ -343,6 +431,8 @@ export async function applyBackup(
     menus: { created: 0 },
     forms: { created: 0 },
     settings: { updated: 0 },
+    themes: { created: 0, updated: 0, skipped: 0 },
+    plugins: { created: 0, updated: 0, skipped: 0, rejected: 0 },
   }
 
   // ── Site metadata ────────────────────────────────────────────────────────
@@ -612,6 +702,178 @@ export async function applyBackup(
         status: backupForm.status as 'active' | 'draft' | 'closed',
       })
       result.forms.created++
+    }
+  }
+
+  // ── Themes ────────────────────────────────────────────────────────────────
+  // Matched by packageName (the closest thing themes have to a natural slug — `id` is a
+  // generated ulid, regenerated on insert here same as everywhere else in this file).
+  // A restored theme is always inserted inactive, even in overwrite mode: silently
+  // swapping the live theme's CSS out from under a running site is a bigger surprise than
+  // leaving the admin to activate it deliberately from Admin → Themes afterward.
+  if (opts.what.includes('themes') && backup.themes) {
+    for (const backupTheme of backup.themes) {
+      const existing = await db.query.themes.findFirst({
+        where: and(eq(themes.siteId, siteId), eq(themes.packageName, backupTheme.packageName)),
+      })
+
+      if (existing && opts.conflictMode === 'skip') {
+        result.themes.skipped++
+        continue
+      }
+
+      if (existing && opts.conflictMode === 'overwrite') {
+        await db.update(themes).set({
+          name: backupTheme.name,
+          version: backupTheme.version,
+          hasCss: backupTheme.hasCss,
+          settings: backupTheme.settings ?? undefined,
+        }).where(eq(themes.id, existing.id))
+        if (backupTheme.hasCss && backupTheme.css) await putThemeCSS(event, siteId, existing.id, backupTheme.css)
+        if (backupTheme.demo) await putThemeDemo(event, siteId, existing.id, backupTheme.demo)
+        result.themes.updated++
+        continue
+      }
+
+      // No conflict, or conflictMode === 'archive' (existing theme is left untouched —
+      // themes don't carry the "current draft" ambiguity content/menus/forms do, so
+      // there's nothing to rename, just a second inactive theme to pick from).
+      const id = ulid()
+      const packageName = existing
+        ? `${backupTheme.packageName}-backup-${Date.now()}`
+        : backupTheme.packageName
+      await db.insert(themes).values({
+        id, siteId,
+        packageName,
+        name: backupTheme.name,
+        version: backupTheme.version,
+        isActive: false,
+        hasCss: backupTheme.hasCss,
+        settings: backupTheme.settings ?? undefined,
+      })
+      if (backupTheme.hasCss && backupTheme.css) await putThemeCSS(event, siteId, id, backupTheme.css)
+      if (backupTheme.demo) await putThemeDemo(event, siteId, id, backupTheme.demo)
+      result.themes.created++
+    }
+  }
+
+  // ── Dynamic plugins ──────────────────────────────────────────────────────────
+  // Unlike every other backup section, dynamicPlugins.id is the publisher-assigned
+  // manifest id — it's both the KV key segment and the primary key, so (a) it's the
+  // natural restore-matching key and (b) there's no way to "archive" a duplicate: a
+  // second row can't reuse the same id (primary key), and a different id would use a
+  // different KV namespace entirely, i.e. not actually be a restore of this plugin. So
+  // conflictMode 'archive' behaves like 'skip' here, and only 'overwrite' can touch an
+  // existing install. Every restored plugin is re-verified (checksum + Ed25519 signature
+  // + publisher-key trust pinning) exactly as server/api/v1/dynamic-plugins/index.post.ts
+  // does on a fresh install — a backup.json is user-editable before upload, so nothing
+  // about its embedded code is trusted until it re-proves the same signature.
+  if (opts.what.includes('plugins') && backup.plugins) {
+    for (const backupPlugin of backup.plugins) {
+      const existing = await db.query.dynamicPlugins.findFirst({
+        where: and(eq(dynamicPlugins.siteId, siteId), eq(dynamicPlugins.id, backupPlugin.pluginId)),
+      })
+      if (existing && opts.conflictMode !== 'overwrite') {
+        result.plugins.skipped++
+        continue
+      }
+      if (!backupPlugin.serverCode && !backupPlugin.clientBundle) {
+        result.plugins.skipped++
+        continue
+      }
+
+      if (backupPlugin.serverCode && backupPlugin.serverChecksum) {
+        const actual = await computeSha256(backupPlugin.serverCode)
+        if (actual !== backupPlugin.serverChecksum) {
+          result.plugins.rejected++
+          continue
+        }
+      }
+      if (backupPlugin.clientBundle && backupPlugin.clientChecksum) {
+        const actual = await computeSha256(backupPlugin.clientBundle)
+        if (actual !== backupPlugin.clientChecksum) {
+          result.plugins.rejected++
+          continue
+        }
+      }
+
+      let signatureValid: boolean
+      try {
+        signatureValid = await verifyPluginSignature(backupPlugin.publisherPublicKey, {
+          id: backupPlugin.pluginId,
+          version: backupPlugin.version,
+          serverChecksum: backupPlugin.serverChecksum ?? 'none',
+          clientChecksum: backupPlugin.clientChecksum ?? 'none',
+        }, backupPlugin.signature)
+      } catch {
+        signatureValid = false
+      }
+      if (!signatureValid) {
+        result.plugins.rejected++
+        continue
+      }
+
+      const trust = await db.query.dynamicPluginTrust.findFirst({
+        where: and(eq(dynamicPluginTrust.siteId, siteId), eq(dynamicPluginTrust.pluginId, backupPlugin.pluginId)),
+      })
+      if (trust && trust.publisherPublicKey !== backupPlugin.publisherPublicKey) {
+        result.plugins.rejected++
+        continue
+      }
+
+      // dynamicPlugins.id has no per-site scoping in its primary key (see the comment
+      // above the loop) — a plugin id already installed on a DIFFERENT site can't also be
+      // inserted here, that's a raw SQLITE_CONSTRAINT_PRIMARYKEY away. Checked only on the
+      // insert path (not the update-existing path above, which is already this exact row).
+      if (!existing) {
+        const elsewhere = await db.query.dynamicPlugins.findFirst({
+          where: eq(dynamicPlugins.id, backupPlugin.pluginId),
+          columns: { id: true },
+        })
+        if (elsewhere) {
+          result.plugins.skipped++
+          continue
+        }
+      }
+
+      if (backupPlugin.serverCode) await putPluginServerCode(event, siteId, backupPlugin.pluginId, backupPlugin.serverCode)
+      if (backupPlugin.clientBundle) await putPluginClientBundle(event, siteId, backupPlugin.pluginId, backupPlugin.clientBundle)
+
+      if (existing) {
+        await db.update(dynamicPlugins).set({
+          name: backupPlugin.name,
+          version: backupPlugin.version,
+          description: backupPlugin.description,
+          hasServer: Boolean(backupPlugin.serverCode),
+          hasClient: Boolean(backupPlugin.clientBundle),
+          serverChecksum: backupPlugin.serverChecksum,
+          clientChecksum: backupPlugin.clientChecksum,
+          publisherPublicKey: backupPlugin.publisherPublicKey,
+          signature: backupPlugin.signature,
+        }).where(eq(dynamicPlugins.id, existing.id))
+        result.plugins.updated++
+      } else {
+        await db.insert(dynamicPlugins).values({
+          id: backupPlugin.pluginId,
+          siteId,
+          name: backupPlugin.name,
+          version: backupPlugin.version,
+          description: backupPlugin.description,
+          isActive: false,
+          hasServer: Boolean(backupPlugin.serverCode),
+          hasClient: Boolean(backupPlugin.clientBundle),
+          serverChecksum: backupPlugin.serverChecksum,
+          clientChecksum: backupPlugin.clientChecksum,
+          publisherPublicKey: backupPlugin.publisherPublicKey,
+          signature: backupPlugin.signature,
+        })
+        result.plugins.created++
+        if (!trust) {
+          await db.insert(dynamicPluginTrust).values({
+            id: ulid(), siteId, pluginId: backupPlugin.pluginId, publisherPublicKey: backupPlugin.publisherPublicKey,
+          })
+        }
+      }
     }
   }
 

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { generateText } from 'ai'
-import { requireAuth } from '../../../utils/permissions'
+import { requireRole } from '../../../utils/permissions'
 import { requireAiSdkModel, callAiOrThrow } from '../../../utils/ai-sdk'
 import { rateLimit } from '../../../utils/rate-limit'
 
@@ -28,7 +28,7 @@ const FORMAT_INSTRUCTIONS: Record<string, string> = {
 }
 
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  await requireRole(event, 'editor')
   await rateLimit(event, { limit: 15, windowMs: 60_000, keyPrefix: 'ai-content' })
 
   const model = await requireAiSdkModel(event, 'fast')

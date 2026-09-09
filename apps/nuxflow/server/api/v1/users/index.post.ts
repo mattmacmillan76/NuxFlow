@@ -8,6 +8,7 @@ import { buildAuditLogInsert, batchWithAudit } from '../../../utils/audit'
 import { sendEmail, escapeHtml } from '../../../utils/email'
 import { rateLimit } from '../../../utils/rate-limit'
 import { created } from '../../../utils/response'
+import { getOrCreateBetterAuth } from '../../../utils/better-auth'
 
 const bodySchema = z.object({
   name: z.string().min(1).max(100),

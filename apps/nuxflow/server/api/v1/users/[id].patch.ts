@@ -18,6 +18,12 @@ export default defineEventHandler(async (event) => {
   const db = useDb(event)
 
   if (body.role) {
+    // Mirrors the guard in [id].delete.ts: changing your own role here has no
+    // confirmation step in the UI (unlike removal, which asks first) and an admin
+    // demoting themselves — especially the last admin on a site — has no recovery
+    // path short of a super admin stepping in from another site.
+    if (targetId === userId) throw badRequest('You cannot change your own role')
+
     const existing = await getUserSiteRole(db, targetId, siteId)
 
     // Mirrors the guard in [id].delete.ts: an `admin` must never be able to touch a

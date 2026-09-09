@@ -117,7 +117,7 @@ describe('POST /api/v1/ai/seo-suggest', () => {
     mockGetAiSdkModel.mockResolvedValueOnce(null)
 
     await expect(
-      (seoSuggestHandler as HandlerFn)(mkEvent({ title: 'My Article' })),
+      (seoSuggestHandler as HandlerFn)(mkEditorEvent({ title: 'My Article' })),
     ).rejects.toMatchObject({ statusCode: 503 })
   })
 
@@ -129,7 +129,7 @@ describe('POST /api/v1/ai/seo-suggest', () => {
     })
 
     const result = await (seoSuggestHandler as HandlerFn)(
-      mkEvent({ title: 'My Article', body: 'Some content about dogs.' }),
+      mkEditorEvent({ title: 'My Article', body: 'Some content about dogs.' }),
     ) as { seoTitle: string; seoDescription: string }
 
     expect(result.seoTitle).toBe('AI Generated Title')
@@ -142,7 +142,7 @@ describe('POST /api/v1/ai/seo-suggest', () => {
     mockGenerateText.mockResolvedValueOnce({ text: 'this is not valid json at all' })
 
     const result = await (seoSuggestHandler as HandlerFn)(
-      mkEvent({ title: 'Fallback Title' }),
+      mkEditorEvent({ title: 'Fallback Title' }),
     ) as { seoTitle: string; seoDescription: string }
 
     expect(result.seoTitle).toBe('Fallback Title')
@@ -155,13 +155,13 @@ describe('POST /api/v1/ai/seo-suggest', () => {
     mockGenerateText.mockRejectedValueOnce(new Error('Provider network error'))
 
     await expect(
-      (seoSuggestHandler as HandlerFn)(mkEvent({ title: 'Error Test' })),
+      (seoSuggestHandler as HandlerFn)(mkEditorEvent({ title: 'Error Test' })),
     ).rejects.toMatchObject({ statusCode: 502 })
   })
 
   it('returns a validation error when title is missing', async () => {
     await expect(
-      (seoSuggestHandler as HandlerFn)(mkEvent({ body: 'some content without a title' })),
+      (seoSuggestHandler as HandlerFn)(mkEditorEvent({ body: 'some content without a title' })),
     ).rejects.toThrow()
   })
 })
@@ -175,7 +175,7 @@ describe('POST /api/v1/ai/alt-text', () => {
     mockGetAiSdkModel.mockResolvedValueOnce(null)
 
     await expect(
-      (altTextHandler as HandlerFn)(mkEvent({ mediaId })),
+      (altTextHandler as HandlerFn)(mkEditorEvent({ mediaId })),
     ).rejects.toMatchObject({ statusCode: 503 })
   })
 
@@ -183,7 +183,7 @@ describe('POST /api/v1/ai/alt-text', () => {
     mockGetAiSdkModel.mockResolvedValueOnce(Symbol('fake-model'))
 
     await expect(
-      (altTextHandler as HandlerFn)(mkEvent({ mediaId: 'nonexistent-media-id-00000' })),
+      (altTextHandler as HandlerFn)(mkEditorEvent({ mediaId: 'nonexistent-media-id-00000' })),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 
@@ -191,7 +191,7 @@ describe('POST /api/v1/ai/alt-text', () => {
     mockGetAiSdkModel.mockResolvedValueOnce(Symbol('fake-model'))
     mockGenerateText.mockResolvedValueOnce({ text: '  A cheerful person smiling at the camera  ' })
 
-    const result = await (altTextHandler as HandlerFn)(mkEvent({ mediaId })) as { altText: string }
+    const result = await (altTextHandler as HandlerFn)(mkEditorEvent({ mediaId })) as { altText: string }
 
     expect(result.altText).toBe('A cheerful person smiling at the camera')
   })
@@ -200,7 +200,7 @@ describe('POST /api/v1/ai/alt-text', () => {
     mockGetAiSdkModel.mockResolvedValueOnce(Symbol('fake-model'))
     mockGenerateText.mockResolvedValueOnce({ text: 'Alt text result' })
 
-    await (altTextHandler as HandlerFn)(mkEvent({ mediaId }))
+    await (altTextHandler as HandlerFn)(mkEditorEvent({ mediaId }))
 
     const [callArgs] = mockGenerateText.mock.calls.at(-1) as [Record<string, unknown>]
     expect(callArgs.prompt as string).toContain('hero-photo.jpg')
@@ -216,7 +216,7 @@ describe('POST /api/v1/ai/improve', () => {
     mockGetAiSdkModel.mockResolvedValueOnce(null)
 
     await expect(
-      (improveHandler as HandlerFn)(mkEvent({ text: 'Some text', instruction: 'improve' })),
+      (improveHandler as HandlerFn)(mkEditorEvent({ text: 'Some text', instruction: 'improve' })),
     ).rejects.toMatchObject({ statusCode: 503 })
   })
 
@@ -225,7 +225,7 @@ describe('POST /api/v1/ai/improve', () => {
     mockGenerateText.mockResolvedValueOnce({ text: JSON.stringify(['Alt 1', 'Alt 2', 'Alt 3']) })
 
     const result = await (improveHandler as HandlerFn)(
-      mkEvent({ text: 'Some text', instruction: 'shorten' }),
+      mkEditorEvent({ text: 'Some text', instruction: 'shorten' }),
     ) as { alternatives: string[] }
 
     expect(result.alternatives).toEqual(['Alt 1', 'Alt 2', 'Alt 3'])
@@ -236,7 +236,7 @@ describe('POST /api/v1/ai/improve', () => {
     mockGenerateText.mockResolvedValueOnce({ text: 'plain text response' })
 
     const result = await (improveHandler as HandlerFn)(
-      mkEvent({ text: 'Some text' }),
+      mkEditorEvent({ text: 'Some text' }),
     ) as { alternatives: string[] }
 
     expect(result.alternatives).toEqual(['plain text response'])
@@ -247,7 +247,7 @@ describe('POST /api/v1/ai/improve', () => {
     mockGenerateText.mockRejectedValueOnce(new Error('Rate limited'))
 
     await expect(
-      (improveHandler as HandlerFn)(mkEvent({ text: 'Some text' })),
+      (improveHandler as HandlerFn)(mkEditorEvent({ text: 'Some text' })),
     ).rejects.toMatchObject({ statusCode: 502 })
   })
 })
@@ -294,7 +294,7 @@ describe('POST /api/v1/ai/generate-content', () => {
 
     await expect(
       (generateContentHandler as HandlerFn)(
-        mkEvent({ description: 'Write about sustainable travel', tone: 'professional', format: 'prose' }),
+        mkEditorEvent({ description: 'Write about sustainable travel', tone: 'professional', format: 'prose' }),
       ),
     ).rejects.toMatchObject({ statusCode: 503 })
   })
@@ -305,7 +305,7 @@ describe('POST /api/v1/ai/generate-content', () => {
     mockGenerateText.mockResolvedValueOnce({ text: '  <p>Sustainable travel matters.</p>  ' })
 
     const result = await (generateContentHandler as HandlerFn)(
-      mkEvent({ description: 'Write about sustainable travel', tone: 'professional', format: 'prose' }),
+      mkEditorEvent({ description: 'Write about sustainable travel', tone: 'professional', format: 'prose' }),
     ) as { html: string }
 
     expect(result.html).toBe('<p>Sustainable travel matters.</p>')
@@ -317,7 +317,7 @@ describe('POST /api/v1/ai/generate-content', () => {
     mockGenerateText.mockResolvedValueOnce({ text: '<p>Content</p>' })
 
     await (generateContentHandler as HandlerFn)(
-      mkEvent({ description: 'Write something', tone: 'casual', format: 'listicle' }),
+      mkEditorEvent({ description: 'Write something', tone: 'casual', format: 'listicle' }),
     )
 
     const [callArgs] = mockGenerateText.mock.calls.at(-1) as [Record<string, unknown>]
@@ -328,7 +328,7 @@ describe('POST /api/v1/ai/generate-content', () => {
 
   it('returns a validation error when description is too short', async () => {
     await expect(
-      (generateContentHandler as HandlerFn)(mkEvent({ description: 'Hi' })),
+      (generateContentHandler as HandlerFn)(mkEditorEvent({ description: 'Hi' })),
     ).rejects.toThrow()
   })
 
@@ -339,8 +339,20 @@ describe('POST /api/v1/ai/generate-content', () => {
 
     await expect(
       (generateContentHandler as HandlerFn)(
-        mkEvent({ description: 'Write about something interesting', tone: 'friendly', format: 'howto' }),
+        mkEditorEvent({ description: 'Write about something interesting', tone: 'friendly', format: 'howto' }),
       ),
     ).rejects.toMatchObject({ statusCode: 502 })
+  })
+
+  // AI generation is metered, provider-billed authoring tooling — same baseline as
+  // bulk-alt-text/generate-image (both already require 'editor'). A bare 'author' role
+  // (this file's `mkEvent`) must be rejected, not silently treated as sufficient the way
+  // a plain requireAuth() check would.
+  it('rejects an author-role caller — AI generation requires editor or above', async () => {
+    await expect(
+      (generateContentHandler as HandlerFn)(
+        mkEvent({ description: 'Write about something interesting', tone: 'friendly', format: 'howto' }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 })
   })
 })

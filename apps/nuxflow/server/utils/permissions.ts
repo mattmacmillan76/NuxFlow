@@ -30,7 +30,24 @@ export async function requireAuth(event: H3Event): Promise<{ userId: string; rol
     where: and(eq(userSiteRoles.userId, session.user.id), eq(userSiteRoles.siteId, siteId)),
   })
 
-  return { userId: session.user.id, role: (roleRow?.role ?? 'viewer') as Role }
+  if (roleRow) return { userId: session.user.id, role: roleRow.role as Role }
+
+  // No explicit relationship to this site. A super admin still gets read-only
+  // 'viewer' access here — matches requireSuperAdmin's documented cross-site model
+  // (super admin access to another site's admin panel is automatic, but their
+  // effective role for content OPERATIONS there stays 'viewer' unless a real
+  // user_site_roles row exists — see the module doc in CLAUDE.md). Anyone else has
+  // never been invited to or registered on this site and must be rejected outright:
+  // user accounts are global across this multi-tenant install (users/accounts carry
+  // no siteId) and login has no site-membership check, so silently defaulting a
+  // stranger to 'viewer' here would let a user invited to ANY other site — or
+  // self-registered somewhere with public registration enabled — read this site's
+  // admin-only data too (drafts, private/members-only content, media library, etc.).
+  if (await hasSuperAdminRole(db, session.user.id)) {
+    return { userId: session.user.id, role: 'viewer' }
+  }
+
+  throw forbidden('You do not have access to this site')
 }
 
 export async function requireRole(event: H3Event, minimum: Role) {

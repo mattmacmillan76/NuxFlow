@@ -12,8 +12,8 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import type { H3Event } from 'h3'
 import { initTestDb, teardownTestDb, getCurrentTestDb } from '../helpers/db'
 import { createMockEvent } from '../helpers/event'
-import { seedSite, seedUser, seedContentType, seedContentItem } from '../helpers/seed'
-import { taxonomies, taxonomyTerms, contentTaxonomyTerms, contentItems, menus, forms, siteSettings, themes, dynamicPlugins } from '@nuxflow/db/schema'
+import { seedSite, seedUser, seedContentType, seedContentItem, seedTier } from '../helpers/seed'
+import { taxonomies, taxonomyTerms, contentTaxonomyTerms, contentItems, menus, forms, siteSettings, themes, dynamicPlugins, users, userSiteRoles, membershipTiers } from '@nuxflow/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { ulid } from 'ulid'
 import { resolveSetting, saveSetting } from '../../server/utils/settings'
@@ -46,6 +46,23 @@ vi.mock('../../server/utils/plugin-signing', () => ({
   verifyPluginSignature: async (_key: string, _payload: unknown, signature: string) => signature === 'valid-signature',
 }))
 
+// findOrCreateUserAccount() (used by the 'users' restore section) calls
+// auth.api.signUpEmail() for an email with no existing account — simulate that by
+// actually inserting the user row it expects to find afterward, same as a real
+// Better Auth sign-up would leave behind.
+const mockRequestPasswordReset = vi.fn().mockResolvedValue(undefined)
+vi.mock('../../server/utils/better-auth', () => ({
+  getOrCreateBetterAuth: async () => ({
+    api: {
+      signUpEmail: async ({ body }: { body: { name: string; email: string } }) => {
+        await getCurrentTestDb().insert(users).values({ id: ulid(), name: body.name, email: body.email, emailVerified: false })
+      },
+      requestPasswordReset: mockRequestPasswordReset,
+    },
+  }),
+  clearBetterAuthCache: vi.fn(),
+}))
+
 const { buildBackup, applyBackup } = await import('../../server/utils/backup')
 
 const SOURCE_SITE = 'site-backup-src-01'
@@ -57,6 +74,7 @@ let newsTermId: string
 let updatesTermId: string
 let postId: string
 let sourceThemeId: string
+let sourceEditorId: string
 
 function mkEvent(siteId: string) {
   return createMockEvent({ siteId }) as unknown as H3Event
@@ -123,6 +141,15 @@ beforeAll(async () => {
     publisherPublicKey: 'pub-key-abc', signature: 'valid-signature',
   })
   kvStore.set(`plugin:${SOURCE_SITE}:demo-plugin:server`, 'server-code')
+
+  // A real team member (excluded: super_admin, tested separately below) and a
+  // membership tier on the source site, for the users/membershipTiers restore tests.
+  sourceEditorId = await seedUser(db, { email: 'editor@backup-src.test', name: 'Source Editor' })
+  await db.insert(userSiteRoles).values({ id: ulid(), userId: sourceEditorId, siteId: SOURCE_SITE, role: 'editor' })
+  const superAdminId = await seedUser(db, { email: 'superadmin@backup-src.test', name: 'Source Super Admin' })
+  await db.insert(userSiteRoles).values({ id: ulid(), userId: superAdminId, siteId: SOURCE_SITE, role: 'super_admin' })
+
+  await seedTier(db, SOURCE_SITE, { name: 'Pro', price: 1999, features: ['Feature A', 'Feature B'] })
 })
 
 afterAll(teardownTestDb)
@@ -351,5 +378,110 @@ describe('applyBackup() — restoring themes and plugins', () => {
     })
     expect(row).toBeFalsy()
     expect(kvStore.has(`plugin:${REJECT_SITE}:demo-plugin:server`)).toBe(false)
+  })
+})
+
+describe('buildBackup() — users and membership tiers', () => {
+  it('exports real team members but never super_admin', async () => {
+    const backup = await buildBackup(mkEvent(SOURCE_SITE), SOURCE_SITE)
+    const editor = backup.users.find(u => u.email === 'editor@backup-src.test')
+    expect(editor).toEqual({ email: 'editor@backup-src.test', name: 'Source Editor', role: 'editor' })
+    expect(backup.users.some(u => u.role === 'super_admin')).toBe(false)
+    expect(backup.users.find(u => u.email === 'superadmin@backup-src.test')).toBeUndefined()
+  })
+
+  it('exports membership tiers (configuration only — no subscriptions)', async () => {
+    const backup = await buildBackup(mkEvent(SOURCE_SITE), SOURCE_SITE)
+    const tier = backup.membershipTiers.find(t => t.name === 'Pro')
+    expect(tier).toBeTruthy()
+    expect(tier!.price).toBe(1999)
+    expect(tier!.features).toEqual(['Feature A', 'Feature B'])
+    expect(backup).not.toHaveProperty('subscriptions')
+  })
+})
+
+describe('applyBackup() — restoring users and membership tiers', () => {
+  it('provisions a brand-new account for a team member who does not exist on the target, and emails them', async () => {
+    // The seeded editor's global account already exists (created directly in
+    // beforeAll, to give them a role to export in the first place) — restore onto
+    // ANY site would find that real account, correctly *not* treating it as new. To
+    // exercise the actual "never existed anywhere" path, inject a synthetic user with
+    // an email nothing in this file has ever seeded.
+    const backup = await buildBackup(mkEvent(SOURCE_SITE), SOURCE_SITE)
+    const withBrandNewUser = {
+      ...backup,
+      users: [...backup.users, { email: 'brand-new@backup-src.test', name: 'Brand New', role: 'editor' as const }],
+    }
+
+    const result = await applyBackup(mkEvent(TARGET_SITE), TARGET_SITE, withBrandNewUser, {
+      what: ['users'],
+      conflictMode: 'skip',
+    })
+    expect(result.users.created).toBe(2) // the seeded editor + the brand-new user — super_admin was never in the backup
+
+    const db = getCurrentTestDb()
+    const newUser = await db.query.users.findFirst({ where: eq(users.email, 'brand-new@backup-src.test') })
+    expect(newUser).toBeTruthy()
+
+    const role = await db.query.userSiteRoles.findFirst({
+      where: and(eq(userSiteRoles.userId, newUser!.id), eq(userSiteRoles.siteId, TARGET_SITE)),
+    })
+    expect(role?.role).toBe('editor')
+
+    expect(mockRequestPasswordReset).toHaveBeenCalledWith({
+      body: { email: 'brand-new@backup-src.test', redirectTo: '/reset-password' },
+    })
+  })
+
+  it('assigns a role to an already-existing account without re-creating it or emailing them', async () => {
+    const db = getCurrentTestDb()
+    const existingId = await seedUser(db, { email: 'already-here@backup-src.test', name: 'Already Here' })
+
+    const backup = await buildBackup(mkEvent(SOURCE_SITE), SOURCE_SITE)
+    const withExisting = {
+      ...backup,
+      users: [...backup.users, { email: 'already-here@backup-src.test', name: 'Already Here', role: 'viewer' as const }],
+    }
+
+    mockRequestPasswordReset.mockClear()
+    const result = await applyBackup(mkEvent(REJECT_SITE), REJECT_SITE, withExisting, {
+      what: ['users'],
+      conflictMode: 'skip',
+    })
+    expect(result.users.created).toBeGreaterThanOrEqual(1) // the editor, freshly provisioned on this site too
+
+    const role = await db.query.userSiteRoles.findFirst({
+      where: and(eq(userSiteRoles.userId, existingId), eq(userSiteRoles.siteId, REJECT_SITE)),
+    })
+    expect(role?.role).toBe('viewer')
+    expect(mockRequestPasswordReset).not.toHaveBeenCalledWith({
+      body: { email: 'already-here@backup-src.test', redirectTo: '/reset-password' },
+    })
+  })
+
+  it('creates a membership tier matched by name, and reapplies changes on overwrite', async () => {
+    const backup = await buildBackup(mkEvent(SOURCE_SITE), SOURCE_SITE)
+    const created = await applyBackup(mkEvent(TARGET_SITE), TARGET_SITE, backup, {
+      what: ['membershipTiers'],
+      conflictMode: 'skip',
+    })
+    expect(created.membershipTiers.created).toBe(1)
+
+    const db = getCurrentTestDb()
+    const tier = await db.query.membershipTiers.findFirst({
+      where: and(eq(membershipTiers.siteId, TARGET_SITE), eq(membershipTiers.name, 'Pro')),
+    })
+    expect(tier?.price).toBe(1999)
+
+    // Drift on the target, then overwrite-restore should reapply the backup's price.
+    await db.update(membershipTiers).set({ price: 1 }).where(eq(membershipTiers.id, tier!.id))
+    const updated = await applyBackup(mkEvent(TARGET_SITE), TARGET_SITE, backup, {
+      what: ['membershipTiers'],
+      conflictMode: 'overwrite',
+    })
+    expect(updated.membershipTiers.updated).toBe(1)
+
+    const reapplied = await db.query.membershipTiers.findFirst({ where: eq(membershipTiers.id, tier!.id) })
+    expect(reapplied?.price).toBe(1999)
   })
 })

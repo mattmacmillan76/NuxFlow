@@ -1,6 +1,59 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: ['auth'] })
-useHead({ title: 'Database Export' })
+useHead({ title: 'Database' })
+
+interface SiteSizeStats {
+  siteId: string
+  siteName: string
+  siteDomain: string
+  contentItemCount: number
+  contentBytes: number
+  revisionCount: number
+  revisionBytes: number
+  mediaCount: number
+  mediaBytes: number
+  localFallbackMediaCount: number
+  approxTotalBytes: number
+}
+interface D1Stats {
+  approxDatabaseSizeBytes: number
+  paidPlanSizeCapBytes: number
+  sites: SiteSizeStats[]
+}
+
+const { data: stats, pending: statsPending, error: statsError, refresh: refreshStats } = await useFetch<D1Stats>('/api/v1/admin/db-stats')
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let value = bytes
+  let unit = -1
+  do {
+    value /= 1024
+    unit++
+  } while (value >= 1024 && unit < units.length - 1)
+  return `${value.toFixed(value < 10 ? 2 : 1)} ${units[unit]}`
+}
+
+const capUsagePercent = computed(() => {
+  if (!stats.value || !stats.value.paidPlanSizeCapBytes) return 0
+  return Math.min(100, (stats.value.approxDatabaseSizeBytes / stats.value.paidPlanSizeCapBytes) * 100)
+})
+const capUsageColor = computed(() => {
+  if (capUsagePercent.value >= 85) return 'error'
+  if (capUsagePercent.value >= 60) return 'warning'
+  return 'success'
+})
+
+const sitesWithLocalFallback = computed(() => (stats.value?.sites ?? []).filter(s => s.localFallbackMediaCount > 0))
+
+const sizeColumns = [
+  { accessorKey: 'siteName', header: 'Site' },
+  { accessorKey: 'content', header: 'Content' },
+  { accessorKey: 'revisions', header: 'Revisions' },
+  { accessorKey: 'media', header: 'Media' },
+  { accessorKey: 'approxTotalBytes', header: 'Approx. size' },
+]
 
 const downloading = ref(false)
 const downloadError = ref('')
@@ -15,10 +68,33 @@ async function downloadExport() {
       const data = await res.json().catch(() => null) as { message?: string } | null
       throw new Error(data?.message ?? `Export failed (${res.status})`)
     }
-    const tableCount = Number(res.headers.get('X-NuxFlow-Table-Count') ?? 0)
-    const rowCount = Number(res.headers.get('X-NuxFlow-Row-Count') ?? 0)
 
+    // The export streams straight to this response as it's generated (see
+    // db-export.get.ts) rather than being buffered and returned all at once — a large
+    // database used to crash the Worker's own memory limit that way. That means table/row
+    // counts aren't known until the stream finishes, so they can't be response headers
+    // (those are sent before the body); they, and any mid-stream failure, come back as a
+    // trailing SQL comment instead. A mid-stream failure still returns HTTP 200 (the
+    // status line was already committed before the failure happened), so it has to be
+    // detected from the body text, not res.ok.
     const blob = await res.blob()
+    const text = await blob.text()
+
+    const failed = text.match(/-- EXPORT FAILED: (.+)/)
+    if (failed) throw new Error(failed[1])
+
+    // A response with neither the completion trailer nor an EXPORT FAILED marker means
+    // the connection or the server process died mid-stream before either could be
+    // written (e.g. the Worker's own isolate memory limit killed it outright — see
+    // d1-export.ts) — the file the browser just saved is truncated and missing its
+    // COMMIT, so this must not be reported as a successful export.
+    const summary = text.match(/-- Exported (\d+) tables?, (\d+) rows?/)
+    if (!summary) {
+      throw new Error('Export response was incomplete — the connection dropped or the server ran out of memory mid-export before finishing. The downloaded file is truncated; do not restore it. Try again, or use `wrangler d1 export` from the CLI instead.')
+    }
+    const tableCount = Number(summary[1])
+    const rowCount = Number(summary[2])
+
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -36,12 +112,93 @@ async function downloadExport() {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto space-y-6">
+  <div class="max-w-4xl mx-auto space-y-6">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Database Export</h1>
-      <p class="text-sm text-gray-500 mt-0.5">Download a raw SQL snapshot of the entire D1 database</p>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Database</h1>
+      <p class="text-sm text-gray-500 mt-0.5">Instance-wide D1 size, per-site breakdown, and a raw SQL export</p>
     </div>
 
+    <!-- Database size -->
+    <UCard>
+      <template #header>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+              <UIcon name="i-lucide-gauge" class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <p class="font-semibold text-sm text-gray-900 dark:text-white">Approximate database size</p>
+              <p class="text-xs text-gray-400">Every site sharing this D1 instance</p>
+            </div>
+          </div>
+          <UButton icon="i-lucide-refresh-cw" variant="ghost" size="xs" :loading="statsPending" @click="refreshStats()" />
+        </div>
+      </template>
+
+      <div v-if="statsError" class="text-sm text-red-500">Failed to load database stats.</div>
+      <div v-else-if="stats" class="space-y-4">
+        <div class="flex items-baseline justify-between">
+          <span class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatBytes(stats.approxDatabaseSizeBytes) }}</span>
+          <span class="text-xs text-gray-400">of {{ formatBytes(stats.paidPlanSizeCapBytes) }} paid-plan cap per database</span>
+        </div>
+        <UProgress :model-value="capUsagePercent" :color="capUsageColor" size="sm" />
+        <p v-if="capUsagePercent >= 60" class="text-xs" :class="capUsagePercent >= 85 ? 'text-red-500' : 'text-amber-500'">
+          {{ capUsagePercent >= 85 ? 'Approaching the 10 GB cap — plan a new Worker+D1 pool for new tenants soon.' : 'Past halfway to the 10 GB cap — worth planning ahead for a second pool.' }}
+        </p>
+        <p class="text-xs text-gray-400">
+          D1 doesn't expose real on-disk size to a Worker — this sums content, revisions, and media column sizes only (the actual database is somewhat larger). Use it as an early-warning trend, not an exact figure.
+        </p>
+      </div>
+
+      <!-- Local media fallback warning -->
+      <UAlert
+        v-if="sitesWithLocalFallback.length"
+        class="mt-4"
+        icon="i-lucide-triangle-alert"
+        color="warning"
+        variant="soft"
+        :title="`${sitesWithLocalFallback.length} site${sitesWithLocalFallback.length === 1 ? '' : 's'} storing media directly in D1`"
+      >
+        <template #description>
+          <span class="text-gray-800 dark:text-gray-200">
+            No real media provider is configured for: <strong>{{ sitesWithLocalFallback.map(s => s.siteDomain).join(', ') }}</strong>.
+            Uploads are falling back to base64-in-D1 (512 KB/file cap) instead of R2/Cloudflare Images/S3/Bunny — the single biggest avoidable contributor to database size. Configure a provider in that site's Settings → Media.
+          </span>
+        </template>
+      </UAlert>
+
+      <!-- Per-site breakdown -->
+      <div v-if="stats?.sites.length" class="mt-4 overflow-x-auto">
+        <UTable :data="stats.sites" :columns="sizeColumns">
+          <template #siteName-cell="{ row }">
+            <div>
+              <p class="font-medium text-gray-900 dark:text-white text-sm">{{ row.original.siteName }}</p>
+              <p class="text-xs text-gray-400">{{ row.original.siteDomain }}</p>
+            </div>
+          </template>
+          <template #content-cell="{ row }">
+            <span class="text-sm text-gray-600 dark:text-gray-300">{{ row.original.contentItemCount }} items · {{ formatBytes(row.original.contentBytes) }}</span>
+          </template>
+          <template #revisions-cell="{ row }">
+            <span class="text-sm text-gray-600 dark:text-gray-300">{{ row.original.revisionCount }} · {{ formatBytes(row.original.revisionBytes) }}</span>
+          </template>
+          <template #media-cell="{ row }">
+            <span class="text-sm text-gray-600 dark:text-gray-300">
+              {{ row.original.mediaCount }} · {{ formatBytes(row.original.mediaBytes) }}
+              <UBadge v-if="row.original.localFallbackMediaCount" color="warning" variant="subtle" size="xs" class="ml-1">local fallback</UBadge>
+            </span>
+          </template>
+          <template #approxTotalBytes-cell="{ row }">
+            <span class="text-sm font-medium text-gray-900 dark:text-white">{{ formatBytes(row.original.approxTotalBytes) }}</span>
+          </template>
+        </UTable>
+        <p class="text-xs text-gray-400 mt-2">
+          Approximate — sums content/revision/media column sizes only, not every table or row overhead. Use it to compare sites against each other, not as an exact size audit.
+        </p>
+      </div>
+    </UCard>
+
+    <!-- SQL export -->
     <UCard>
       <template #header>
         <div class="flex items-center gap-3">

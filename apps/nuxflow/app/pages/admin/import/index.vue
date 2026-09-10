@@ -40,6 +40,8 @@ const restoreResult = ref<{
     settings: { updated: number }
     themes: { created: number; updated: number; skipped: number }
     plugins: { created: number; updated: number; skipped: number; rejected: number }
+    users: { created: number; updated: number; skipped: number }
+    membershipTiers: { created: number; updated: number; skipped: number }
   }
   media: { uploaded: number; skipped: number }
 } | null>(null)
@@ -54,6 +56,8 @@ const restoreWhatOptions = [
   { value: 'site', label: 'Site info (name, locale, timezone)' },
   { value: 'themes', label: 'Themes (CSS)' },
   { value: 'plugins', label: 'Dynamic plugins (code)' },
+  { value: 'users', label: 'Team members & roles' },
+  { value: 'membershipTiers', label: 'Membership tiers' },
 ]
 
 function onRestoreFile(e: Event) {
@@ -260,7 +264,7 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
         </UAlert>
 
         <div class="grid grid-cols-2 gap-3 text-sm">
-          <div v-for="item in ['Content & pages', 'Categories & tags', 'Menus', 'Forms', 'Site settings', 'Content types', 'Media files', 'Themes (CSS)', 'Dynamic plugins (code)']" :key="item" class="flex items-center gap-2 text-gray-800 dark:text-gray-200 font-medium">
+          <div v-for="item in ['Content & pages', 'Categories & tags', 'Menus', 'Forms', 'Site settings', 'Content types', 'Media files', 'Themes (CSS)', 'Dynamic plugins (code)', 'Team members & roles', 'Membership tiers']" :key="item" class="flex items-center gap-2 text-gray-800 dark:text-gray-200 font-medium">
             <UIcon name="i-lucide-check" class="w-4 h-4 text-green-500 shrink-0" />
             {{ item }}
           </div>
@@ -277,6 +281,17 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
           <template #description>
             <span class="text-gray-800 dark:text-gray-200">
               "Site settings" includes decrypted API keys and secrets (Stripe, email/AI providers, OAuth client secrets, etc.), stored in plain text inside the .zip so they can be restored on a differently-configured deployment. Store this file securely and never send it over an unencrypted channel.
+            </span>
+          </template>
+        </UAlert>
+
+        <UAlert icon="i-lucide-info" color="neutral" variant="soft">
+          <template #title>
+            <span class="font-semibold">Not included: subscriptions and API keys</span>
+          </template>
+          <template #description>
+            <span class="text-gray-800 dark:text-gray-200">
+              Membership tiers (plan definitions) are backed up, but active subscriber billing state isn't — a copied subscription row would look migrated but silently desync, since your payment provider's webhook still points at the original deployment. If you move a site with paying subscribers, update that webhook afterward. API keys can't be restored either — only their one-way hash is ever stored — regenerate them on the target site.
             </span>
           </template>
         </UAlert>
@@ -339,6 +354,14 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
           </div>
         </UFormField>
 
+        <UAlert
+          v-if="restoreWhat.includes('users')"
+          icon="i-lucide-users"
+          color="warning"
+          variant="soft"
+          description="For any team member not already on this site, restoring creates a real account and emails them a set-password link — same as a normal invite. Never restores super admin access."
+        />
+
         <UFormField label="Conflict handling" hint="What to do when a slug already exists">
           <div class="flex flex-wrap gap-4">
             <label class="flex items-center gap-2 text-sm cursor-pointer text-gray-700 dark:text-gray-300">
@@ -378,6 +401,12 @@ const tabs: { value: Tab; label: string; icon: string }[] = [
               </li>
               <li v-if="restoreResult.result.plugins.created || restoreResult.result.plugins.updated || restoreResult.result.plugins.skipped || restoreResult.result.plugins.rejected">
                 Plugins: {{ restoreResult.result.plugins.created }} created<span v-if="restoreResult.result.plugins.updated">, {{ restoreResult.result.plugins.updated }} updated</span><span v-if="restoreResult.result.plugins.skipped">, {{ restoreResult.result.plugins.skipped }} skipped</span><span v-if="restoreResult.result.plugins.rejected" class="text-orange-500">, {{ restoreResult.result.plugins.rejected }} rejected (signature/checksum mismatch)</span> (installed inactive — activate from Admin → Plugins)
+              </li>
+              <li v-if="restoreResult.result.users.created || restoreResult.result.users.updated || restoreResult.result.users.skipped">
+                Team members: {{ restoreResult.result.users.created }} created<span v-if="restoreResult.result.users.updated">, {{ restoreResult.result.users.updated }} updated</span><span v-if="restoreResult.result.users.skipped">, {{ restoreResult.result.users.skipped }} skipped</span>
+              </li>
+              <li v-if="restoreResult.result.membershipTiers.created || restoreResult.result.membershipTiers.updated || restoreResult.result.membershipTiers.skipped">
+                Membership tiers: {{ restoreResult.result.membershipTiers.created }} created<span v-if="restoreResult.result.membershipTiers.updated">, {{ restoreResult.result.membershipTiers.updated }} updated</span><span v-if="restoreResult.result.membershipTiers.skipped">, {{ restoreResult.result.membershipTiers.skipped }} skipped</span>
               </li>
               <li v-if="restoreResult.media.uploaded">Media: {{ restoreResult.media.uploaded }} images uploaded<span v-if="restoreResult.media.skipped">, {{ restoreResult.media.skipped }} skipped</span></li>
             </ul>

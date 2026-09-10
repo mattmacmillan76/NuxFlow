@@ -6,18 +6,21 @@ import {
   taxonomies, taxonomyTerms, contentTaxonomyTerms,
   menus, forms, media,
   themes, dynamicPlugins, dynamicPluginTrust,
+  userSiteRoles, membershipTiers,
 } from '@nuxflow/db/schema'
 import type { FormField, ConditionalLogic } from '@nuxflow/db/schema'
 import { and, eq, inArray } from 'drizzle-orm'
 import { ulid } from 'ulid'
 import { saveSetting, SENSITIVE_SETTING_KEYS } from './settings'
-import { clearBetterAuthCache } from './better-auth'
+import { clearBetterAuthCache, getOrCreateBetterAuth } from './better-auth'
 import { decryptText } from './encryption'
 import {
   getThemeCSS, putThemeCSS, getThemeDemo, putThemeDemo,
   getPluginServerCode, putPluginServerCode, getPluginClientBundle, putPluginClientBundle,
 } from './cf-env'
 import { verifyPluginSignature, computeSha256 } from './plugin-signing'
+import { findOrCreateUserAccount } from './user-provisioning'
+import { getUserSiteRole } from './permissions'
 
 // ── Backup format types ───────────────────────────────────────────────────────
 
@@ -129,6 +132,38 @@ export interface BackupDynamicPlugin {
   clientBundle: string | null
 }
 
+// Email is the restore-matching key (accounts are global, not per-site — see
+// user-provisioning.ts). Never includes 'super_admin': granting that is a deliberately
+// separate, more-guarded flow (POST/DELETE /api/v1/users/:id/super-admin), and a backup
+// file being user-editable before upload means it must never be a path to smuggling
+// super-admin access onto a different site by re-uploading it there.
+export interface BackupUserRole {
+  email: string
+  name: string
+  role: 'admin' | 'editor' | 'author' | 'viewer' | 'member'
+}
+
+// Configuration only — deliberately does NOT include `subscriptions`. A subscription row
+// copied onto a different deployment would look migrated but silently desync from
+// reality: the payment provider's webhook is still configured to call the *original*
+// deployment, so a cancellation/renewal on the new one would never be recorded. Moving a
+// site with paying subscribers to a new deployment needs the operator to also repoint
+// that webhook — no backup format can automate that part.
+export interface BackupMembershipTier {
+  name: string
+  description: string | null
+  price: number
+  currency: string
+  interval: 'month' | 'year' | 'one_time'
+  features: string[]
+  stripeProductId: string | null
+  stripePriceId: string | null
+  lsProductId: string | null
+  lsVariantId: string | null
+  paddleProductId: string | null
+  isActive: boolean
+}
+
 export interface NuxFlowBackup {
   version: '1'
   exportedAt: string
@@ -146,6 +181,8 @@ export interface NuxFlowBackup {
   media: BackupMediaItem[]
   themes: BackupTheme[]
   plugins: BackupDynamicPlugin[]
+  users: BackupUserRole[]
+  membershipTiers: BackupMembershipTier[]
 }
 
 // Replaces all occurrences of old image URLs with new ones throughout the backup JSON.
@@ -168,7 +205,7 @@ export function rewriteImageUrls(backup: NuxFlowBackup, urlMap: Map<string, stri
 export async function buildBackup(event: H3Event, siteId: string): Promise<NuxFlowBackup> {
   const db = useDb(event)
 
-  const [site, settingRows, ctRows, itemRows, taxRows, menuRows, formRows, mediaRows, themeRows, pluginRows] = await Promise.all([
+  const [site, settingRows, ctRows, itemRows, taxRows, menuRows, formRows, mediaRows, themeRows, pluginRows, roleRows, tierRows] = await Promise.all([
     db.query.sites.findFirst({
       where: eq(sites.id, siteId),
       columns: { name: true, locale: true, timezone: true },
@@ -198,6 +235,11 @@ export async function buildBackup(event: H3Event, siteId: string): Promise<NuxFl
     }),
     db.query.themes.findMany({ where: eq(themes.siteId, siteId) }),
     db.query.dynamicPlugins.findMany({ where: eq(dynamicPlugins.siteId, siteId) }),
+    db.query.userSiteRoles.findMany({
+      where: eq(userSiteRoles.siteId, siteId),
+      with: { user: { columns: { name: true, email: true } } },
+    }),
+    db.query.membershipTiers.findMany({ where: eq(membershipTiers.siteId, siteId) }),
   ])
 
   // Themes: D1 row plus its KV-only CSS/demo payload (see BackupTheme). getThemeCSS()
@@ -236,6 +278,27 @@ export async function buildBackup(event: H3Event, siteId: string): Promise<NuxFl
       clientBundle: p.hasClient ? await getPluginClientBundle(event, siteId, p.id) : null,
     })
   }
+
+  // Excludes super_admin — see the comment on BackupUserRole.
+  const backupUsers: BackupUserRole[] = roleRows
+    .filter((r): r is typeof r & { user: { name: string; email: string }; role: BackupUserRole['role'] } =>
+      r.user !== null && r.role !== 'super_admin')
+    .map(r => ({ email: r.user.email, name: r.user.name, role: r.role }))
+
+  const backupTiers: BackupMembershipTier[] = tierRows.map(t => ({
+    name: t.name,
+    description: t.description,
+    price: t.price,
+    currency: t.currency,
+    interval: t.interval,
+    features: t.features,
+    stripeProductId: t.stripeProductId,
+    stripePriceId: t.stripePriceId,
+    lsProductId: t.lsProductId,
+    lsVariantId: t.lsVariantId,
+    paddleProductId: t.paddleProductId,
+    isActive: t.isActive,
+  }))
 
   // Build type slug lookup
   const typeSlugById = new Map(ctRows.map(t => [t.id, t.slug]))
@@ -366,6 +429,8 @@ export async function buildBackup(event: H3Event, siteId: string): Promise<NuxFl
     })),
     themes: backupThemes,
     plugins: backupPlugins,
+    users: backupUsers,
+    membershipTiers: backupTiers,
   }
 }
 
@@ -378,7 +443,7 @@ export interface RestoreOptions {
   // 'site' in the `what` it passes to applyBackup(), so importing a theme's demo content
   // can never overwrite the live site's name/locale/timezone. Only the real restore route
   // (restore.post.ts) opts into 'site'.
-  what: ('content' | 'settings' | 'menus' | 'taxonomies' | 'forms' | 'site' | 'themes' | 'plugins')[]
+  what: ('content' | 'settings' | 'menus' | 'taxonomies' | 'forms' | 'site' | 'themes' | 'plugins' | 'users' | 'membershipTiers')[]
   conflictMode: 'skip' | 'overwrite' | 'archive'
 }
 
@@ -392,6 +457,8 @@ export interface RestoreResult {
   settings: { updated: number }
   themes: { created: number; updated: number; skipped: number }
   plugins: { created: number; updated: number; skipped: number; rejected: number }
+  users: { created: number; updated: number; skipped: number }
+  membershipTiers: { created: number; updated: number; skipped: number }
 }
 
 // Replaces a content item's taxonomy-term assignments with the ones from the backup.
@@ -433,6 +500,8 @@ export async function applyBackup(
     settings: { updated: 0 },
     themes: { created: 0, updated: 0, skipped: 0 },
     plugins: { created: 0, updated: 0, skipped: 0, rejected: 0 },
+    users: { created: 0, updated: 0, skipped: 0 },
+    membershipTiers: { created: 0, updated: 0, skipped: 0 },
   }
 
   // ── Site metadata ────────────────────────────────────────────────────────
@@ -873,6 +942,95 @@ export async function applyBackup(
             id: ulid(), siteId, pluginId: backupPlugin.pluginId, publisherPublicKey: backupPlugin.publisherPublicKey,
           })
         }
+      }
+    }
+  }
+
+  // ── Users & roles ────────────────────────────────────────────────────────
+  // Matched by email (the natural key — accounts are global, not per-site; see
+  // user-provisioning.ts). Restoring onto a brand-new deployment means none of the
+  // original site's users exist there yet, so this provisions a fresh account (same
+  // temp-password + "set your password" email pattern as a normal invite) for anyone
+  // not already found by email, then assigns them the backed-up role. Never restores
+  // 'super_admin' — buildBackup() already excludes it (see BackupUserRole), so this can
+  // only ever grant real roles, same restriction PATCH/POST /api/v1/users enforce.
+  if (opts.what.includes('users') && backup.users) {
+    for (const backupUser of backup.users) {
+      const { userId: targetUserId, isNewAccount } = await findOrCreateUserAccount(event, {
+        name: backupUser.name,
+        email: backupUser.email,
+      })
+
+      const existingRole = await getUserSiteRole(db, targetUserId, siteId)
+      if (existingRole) {
+        if (opts.conflictMode === 'overwrite' && existingRole.role !== 'super_admin') {
+          await db.update(userSiteRoles).set({ role: backupUser.role })
+            .where(and(eq(userSiteRoles.userId, targetUserId), eq(userSiteRoles.siteId, siteId)))
+          result.users.updated++
+        } else {
+          result.users.skipped++
+        }
+      } else {
+        await db.insert(userSiteRoles).values({ id: ulid(), userId: targetUserId, siteId, role: backupUser.role })
+        result.users.created++
+      }
+
+      if (isNewAccount) {
+        try {
+          const auth = await getOrCreateBetterAuth(event)
+          await auth.api.requestPasswordReset({ body: { email: backupUser.email, redirectTo: '/reset-password' } })
+        } catch (err) {
+          console.error('[restore] Failed to send set-password email:', err)
+        }
+      }
+    }
+  }
+
+  // ── Membership tiers ─────────────────────────────────────────────────────
+  // Matched by name. Deliberately does not touch `subscriptions` — see the comment on
+  // BackupMembershipTier for why copying those rows would be actively misleading.
+  if (opts.what.includes('membershipTiers') && backup.membershipTiers) {
+    for (const backupTier of backup.membershipTiers) {
+      const existing = await db.query.membershipTiers.findFirst({
+        where: and(eq(membershipTiers.siteId, siteId), eq(membershipTiers.name, backupTier.name)),
+      })
+      if (existing) {
+        if (opts.conflictMode === 'overwrite') {
+          await db.update(membershipTiers).set({
+            description: backupTier.description,
+            price: backupTier.price,
+            currency: backupTier.currency,
+            interval: backupTier.interval,
+            features: backupTier.features,
+            stripeProductId: backupTier.stripeProductId,
+            stripePriceId: backupTier.stripePriceId,
+            lsProductId: backupTier.lsProductId,
+            lsVariantId: backupTier.lsVariantId,
+            paddleProductId: backupTier.paddleProductId,
+            isActive: backupTier.isActive,
+          }).where(eq(membershipTiers.id, existing.id))
+          result.membershipTiers.updated++
+        } else {
+          result.membershipTiers.skipped++
+        }
+      } else {
+        await db.insert(membershipTiers).values({
+          id: ulid(),
+          siteId,
+          name: backupTier.name,
+          description: backupTier.description,
+          price: backupTier.price,
+          currency: backupTier.currency,
+          interval: backupTier.interval,
+          features: backupTier.features,
+          stripeProductId: backupTier.stripeProductId,
+          stripePriceId: backupTier.stripePriceId,
+          lsProductId: backupTier.lsProductId,
+          lsVariantId: backupTier.lsVariantId,
+          paddleProductId: backupTier.paddleProductId,
+          isActive: backupTier.isActive,
+        })
+        result.membershipTiers.created++
       }
     }
   }

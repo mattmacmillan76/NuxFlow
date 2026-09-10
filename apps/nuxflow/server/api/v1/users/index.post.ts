@@ -9,6 +9,7 @@ import { sendEmail, escapeHtml } from '../../../utils/email'
 import { rateLimit } from '../../../utils/rate-limit'
 import { created } from '../../../utils/response'
 import { getOrCreateBetterAuth } from '../../../utils/better-auth'
+import { findOrCreateUserAccount } from '../../../utils/user-provisioning'
 
 const bodySchema = z.object({
   name: z.string().min(1).max(100),
@@ -24,44 +25,20 @@ export default defineEventHandler(async (event) => {
   const body = await parseBody(event, bodySchema)
 
   const db = useDb(event)
-  const auth = await getOrCreateBetterAuth(event)
 
-  // Check if a user with this email already exists (e.g. previously removed from this site)
-  let existingUser = await db.query.users.findFirst({
-    where: (u, { eq }) => eq(u.email, body.email),
-    columns: { id: true },
-  })
+  const { userId: newUserId, isNewAccount } = await findOrCreateUserAccount(event, { name: body.name, email: body.email })
 
-  let isNewAccount = false
-
-  if (existingUser) {
+  if (!isNewAccount) {
     // Check they aren't already a member of this site
-    const alreadyMember = await getUserSiteRole(db, existingUser.id, siteId)
+    const alreadyMember = await getUserSiteRole(db, newUserId, siteId)
     if (alreadyMember) {
       throw conflict('This user is already a member of this site')
     }
-  } else {
-    // Better Auth requires a password at sign-up time, but the invited user never
-    // sees or uses this one — it's immediately made moot by the real, working
-    // set-password link emailed below (see the requestPasswordReset call), which
-    // lets the recipient set their own password before ever signing in.
-    const tempPassword = ulid()
-    await auth.api.signUpEmail({
-      body: { name: body.name, email: body.email, password: tempPassword },
-    })
-    existingUser = await db.query.users.findFirst({
-      where: (u, { eq }) => eq(u.email, body.email),
-      columns: { id: true },
-    })
-    if (!existingUser) throw createError({ statusCode: 500, message: 'Failed to create user' })
-    isNewAccount = true
   }
-
-  const newUser = existingUser
 
   const roleInsert = db.insert(userSiteRoles).values({
     id: ulid(),
-    userId: newUser.id,
+    userId: newUserId,
     siteId,
     role: body.role,
   })
@@ -69,7 +46,7 @@ export default defineEventHandler(async (event) => {
   const auditInsert = buildAuditLogInsert(event, userId, {
     action: 'invite',
     resource: 'user',
-    resourceId: newUser.id,
+    resourceId: newUserId,
     after: { role: body.role, email: body.email },
   })
   await batchWithAudit(db, [roleInsert], auditInsert)
@@ -86,6 +63,7 @@ export default defineEventHandler(async (event) => {
     // sent here, since a second email pointing at a login page they can't yet
     // use would only add a dead end, not clarity.
     try {
+      const auth = await getOrCreateBetterAuth(event)
       await auth.api.requestPasswordReset({
         body: { email: body.email, redirectTo: '/reset-password' },
       })
@@ -108,5 +86,5 @@ export default defineEventHandler(async (event) => {
     }).catch(err => console.error('[invite] Email delivery failed:', err))
   }
 
-  return created(event, { id: newUser.id, name: body.name, email: body.email, role: body.role })
+  return created(event, { id: newUserId, name: body.name, email: body.email, role: body.role })
 })

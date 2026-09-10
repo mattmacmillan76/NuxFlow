@@ -1,0 +1,104 @@
+import type { H3Event } from 'h3'
+import { getD1 } from './db'
+
+// Cloudflare's own stated design philosophy: "D1 is optimized for per-user, per-tenant,
+// or per-entity database patterns rather than single large databases." A single D1
+// database is capped at 10 GB on paid plans (500 MB on free) with no per-database fee —
+// there's no cost penalty to splitting a busy multi-tenant install into multiple
+// Worker+D1 "pools" once one approaches that ceiling. This module exists so an operator
+// can actually see that coming from inside the product, instead of only finding out via
+// `wrangler d1 info` from the CLI or hitting the cap outright.
+//
+// There is no authoritative on-disk size available from inside a Worker: D1 only
+// supports a fixed subset of PRAGMA statements (table_list/table_info/index_list/
+// foreign_key_list/etc. — see https://developers.cloudflare.com/d1/sql-api/sql-statements/),
+// which notably excludes page_count/page_size (an earlier version of this file tried
+// exactly that and 500'd in production — D1 rejects both outright). The real number
+// Cloudflare shows in its own dashboard comes from their control plane via the D1 REST
+// API, which needs an account-level API token this app doesn't currently ask for or
+// store. So `databaseSizeBytes` here is a same-methodology sum of the per-site
+// approximations below (content/revision/media column lengths), not a real storage
+// measurement — good enough to answer "is it time to plan a second pool", not precise
+// enough to budget the exact remaining headroom to the 10 GB cap.
+//
+// Uses the raw D1 binding (getD1(), like d1-export.ts) rather than Drizzle's query
+// builder — this project's integration-test harness was found to return a different row
+// shape from Drizzle's db.values()/.raw() than the real D1 adapter does, whereas
+// D1Database.prepare().all()'s { results: T[] } contract is Cloudflare's own stable,
+// documented one.
+export const D1_PAID_PLAN_SIZE_CAP_BYTES = 10 * 1024 * 1024 * 1024
+
+export interface SiteSizeStats {
+  siteId: string
+  siteName: string
+  siteDomain: string
+  contentItemCount: number
+  contentBytes: number
+  revisionCount: number
+  revisionBytes: number
+  mediaCount: number
+  mediaBytes: number
+  localFallbackMediaCount: number
+  approxTotalBytes: number
+}
+
+export interface D1SizeStats {
+  /** Sum of every site's approxTotalBytes — see the module doc for why this isn't an authoritative on-disk measurement. */
+  approxDatabaseSizeBytes: number
+  sites: SiteSizeStats[]
+}
+
+export async function getD1SizeStats(event: H3Event): Promise<D1SizeStats> {
+  const d1 = getD1(event)
+
+  const [sitesResult, contentResult, revisionResult, mediaResult] = await Promise.all([
+    d1.prepare('SELECT id, name, domain FROM sites').all<{ id: string; name: string; domain: string }>(),
+    d1.prepare(`
+      SELECT site_id as siteId, COUNT(*) as count, COALESCE(SUM(LENGTH(content)), 0) as bytes
+      FROM content_items GROUP BY site_id
+    `).all<{ siteId: string; count: number; bytes: number }>(),
+    // content_revisions has no direct site_id — join through its parent content item.
+    d1.prepare(`
+      SELECT ci.site_id as siteId, COUNT(*) as count, COALESCE(SUM(LENGTH(cr.content)), 0) as bytes
+      FROM content_revisions cr JOIN content_items ci ON cr.item_id = ci.id
+      GROUP BY ci.site_id
+    `).all<{ siteId: string; count: number; bytes: number }>(),
+    // LENGTH(url) captures what actually matters here: a provider-hosted media row's
+    // url is a short link, while the local base64-data-URI fallback's url IS the file —
+    // this single column tells us both the byte cost and (via the local-provider count
+    // below) whether a site is relying on that fallback at all.
+    d1.prepare(`
+      SELECT site_id as siteId, COUNT(*) as count, COALESCE(SUM(LENGTH(url)), 0) as bytes,
+        SUM(CASE WHEN storage_provider = 'local' THEN 1 ELSE 0 END) as localCount
+      FROM media GROUP BY site_id
+    `).all<{ siteId: string; count: number; bytes: number; localCount: number }>(),
+  ])
+
+  const contentBySite = new Map(contentResult.results.map(r => [r.siteId, r]))
+  const revisionBySite = new Map(revisionResult.results.map(r => [r.siteId, r]))
+  const mediaBySite = new Map(mediaResult.results.map(r => [r.siteId, r]))
+
+  const sites: SiteSizeStats[] = sitesResult.results.map((site) => {
+    const contentStats = contentBySite.get(site.id) ?? { count: 0, bytes: 0 }
+    const revisionStats = revisionBySite.get(site.id) ?? { count: 0, bytes: 0 }
+    const mediaStats = mediaBySite.get(site.id) ?? { count: 0, bytes: 0, localCount: 0 }
+    return {
+      siteId: site.id,
+      siteName: site.name,
+      siteDomain: site.domain,
+      contentItemCount: contentStats.count,
+      contentBytes: contentStats.bytes,
+      revisionCount: revisionStats.count,
+      revisionBytes: revisionStats.bytes,
+      mediaCount: mediaStats.count,
+      mediaBytes: mediaStats.bytes,
+      localFallbackMediaCount: mediaStats.localCount,
+      approxTotalBytes: contentStats.bytes + revisionStats.bytes + mediaStats.bytes,
+    }
+  }).sort((a, b) => b.approxTotalBytes - a.approxTotalBytes)
+
+  return {
+    approxDatabaseSizeBytes: sites.reduce((sum, s) => sum + s.approxTotalBytes, 0),
+    sites,
+  }
+}
